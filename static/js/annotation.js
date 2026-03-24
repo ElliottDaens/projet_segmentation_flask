@@ -1,7 +1,6 @@
 /* ═══════════════════════════════════════════════════════════════════
    Outil d'annotation par POLYGONES
-   L'utilisateur trace des polygones pour délimiter les zones
-   (eau, terre, ciel, bateau moteur, voilier…) sur chaque image.
+   Avec mode plein écran et zoom/pan
    ═══════════════════════════════════════════════════════════════════ */
 
 const canvasImage = document.getElementById('canvas-image');
@@ -10,20 +9,31 @@ const canvasInteract = document.getElementById('canvas-interact');
 const ctxImage = canvasImage.getContext('2d');
 const ctxOverlay = canvasOverlay.getContext('2d');
 const ctxInteract = canvasInteract.getContext('2d');
+const wrapper = document.getElementById('canvas-wrapper');
 
 let currentClassId = 1;
 let currentColor = '#0077FF';
 let currentClassName = 'eau';
 
-let polygons = [];            // [{classId, className, color, points:[[x,y],...]}]
-let currentPoints = [];       // points du polygone en cours de dessin
-let selectedPolyIndex = -1;   // polygone sélectionné (-1 = aucun)
+let polygons = [];
+let currentPoints = [];
+let selectedPolyIndex = -1;
 
 let imgOrigW = 0, imgOrigH = 0;
-let cW = 0, cH = 0;          // taille affichée du canvas
-let scaleX = 1, scaleY = 1;  // ratio affichage → original
+let cW = 0, cH = 0;
+let scaleX = 1, scaleY = 1;
+let loadedImg = null;
 
-const CLOSE_RADIUS = 12;     // px pour fermer le polygone en cliquant le 1er point
+// Zoom & pan
+let zoomLevel = 1;
+let panX = 0, panY = 0;
+let isPanning = false;
+let panStartX = 0, panStartY = 0;
+let panStartPanX = 0, panStartPanY = 0;
+
+const MIN_ZOOM = 0.5;
+const MAX_ZOOM = 8;
+const CLOSE_RADIUS = 12;
 const VERTEX_RADIUS = 5;
 
 // ── Chargement image ────────────────────────────────────────────────
@@ -33,24 +43,27 @@ function loadAnnotationImage() {
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.onload = function () {
+        loadedImg = img;
         imgOrigW = img.naturalWidth;
         imgOrigH = img.naturalHeight;
 
-        // Mesurer l'espace dispo dans la card parente (pas le wrapper inline-block)
-        const card = document.querySelector('.annotation-canvas-area');
-        const availW = card.clientWidth - 30;
-        const scale = availW / imgOrigW;
-        cW = Math.round(imgOrigW * scale);
-        cH = Math.round(imgOrigH * scale);
+        const container = document.querySelector('.annotation-canvas-area');
+        const availW = container.clientWidth - 30;
+        const baseScale = availW / imgOrigW;
+        cW = Math.round(imgOrigW * baseScale);
+        cH = Math.round(imgOrigH * baseScale);
         scaleX = imgOrigW / cW;
         scaleY = imgOrigH / cH;
 
         [canvasImage, canvasOverlay, canvasInteract].forEach(c => {
             c.width = cW;
             c.height = cH;
-            c.style.width = cW + 'px';
-            c.style.height = cH + 'px';
         });
+
+        zoomLevel = 1;
+        panX = 0;
+        panY = 0;
+        applyTransform();
 
         ctxImage.drawImage(img, 0, 0, cW, cH);
         polygons = [];
@@ -58,11 +71,12 @@ function loadAnnotationImage() {
         selectedPolyIndex = -1;
 
         document.getElementById('canvas-hint').textContent =
-            `${imgOrigW}×${imgOrigH}px — Cliquez pour tracer des polygones`;
+            `${imgOrigW}×${imgOrigH}px — Molette = zoom, Espace+clic = déplacer`;
 
         loadExistingAnnotation(filename);
         redraw();
         updatePolygonList();
+        updateZoomLabel();
     };
     img.src = '/api/image/' + filename;
 }
@@ -86,6 +100,161 @@ function loadExistingAnnotation(filename) {
         .catch(() => {});
 }
 
+// ── Zoom & Pan ──────────────────────────────────────────────────────
+
+function applyTransform() {
+    wrapper.style.transformOrigin = '0 0';
+    wrapper.style.transform = `scale(${zoomLevel}) translate(${panX}px, ${panY}px)`;
+    wrapper.style.width = cW + 'px';
+    wrapper.style.height = cH + 'px';
+}
+
+function updateZoomLabel() {
+    const el = document.getElementById('zoom-label');
+    if (el) el.textContent = Math.round(zoomLevel * 100) + '%';
+}
+
+function setZoom(newZoom, centerX, centerY) {
+    newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, newZoom));
+    if (centerX !== undefined && centerY !== undefined) {
+        // Zoom centré sur le curseur
+        panX = centerX / newZoom - centerX / zoomLevel + panX;
+        panY = centerY / newZoom - centerY / zoomLevel + panY;
+    }
+    zoomLevel = newZoom;
+    applyTransform();
+    updateZoomLabel();
+}
+
+function zoomIn() { setZoom(zoomLevel * 1.3); }
+function zoomOut() { setZoom(zoomLevel / 1.3); }
+function zoomReset() { zoomLevel = 1; panX = 0; panY = 0; applyTransform(); updateZoomLabel(); }
+
+// Molette = zoom centré sur curseur
+const scrollContainer = document.querySelector('.annotation-canvas-area');
+scrollContainer.addEventListener('wheel', function (e) {
+    if (!loadedImg) return;
+    e.preventDefault();
+    const rect = canvasInteract.getBoundingClientRect();
+    const mx = (e.clientX - rect.left) / zoomLevel;
+    const my = (e.clientY - rect.top) / zoomLevel;
+    const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+    setZoom(zoomLevel * factor, mx, my);
+}, { passive: false });
+
+// Espace + clic = pan
+let spaceHeld = false;
+document.addEventListener('keydown', function (e) {
+    if (e.code === 'Space' && !e.repeat) {
+        spaceHeld = true;
+        canvasInteract.style.cursor = 'grab';
+    }
+});
+document.addEventListener('keyup', function (e) {
+    if (e.code === 'Space') {
+        spaceHeld = false;
+        isPanning = false;
+        canvasInteract.style.cursor = 'crosshair';
+    }
+});
+
+canvasInteract.addEventListener('mousedown', function (e) {
+    if (spaceHeld || e.button === 1) {
+        e.preventDefault();
+        isPanning = true;
+        panStartX = e.clientX;
+        panStartY = e.clientY;
+        panStartPanX = panX;
+        panStartPanY = panY;
+        canvasInteract.style.cursor = 'grabbing';
+        return;
+    }
+});
+
+window.addEventListener('mousemove', function (e) {
+    if (isPanning) {
+        const dx = (e.clientX - panStartX) / zoomLevel;
+        const dy = (e.clientY - panStartY) / zoomLevel;
+        panX = panStartPanX + dx;
+        panY = panStartPanY + dy;
+        applyTransform();
+    }
+});
+
+window.addEventListener('mouseup', function (e) {
+    if (isPanning) {
+        isPanning = false;
+        canvasInteract.style.cursor = spaceHeld ? 'grab' : 'crosshair';
+    }
+});
+
+// ── Plein écran ─────────────────────────────────────────────────────
+
+function toggleFullscreen() {
+    const area = document.querySelector('.annotation-canvas-area');
+    if (!document.fullscreenElement) {
+        area.requestFullscreen().then(() => {
+            area.classList.add('is-fullscreen');
+            // Recalculer la taille du canvas pour remplir l'écran
+            setTimeout(resizeCanvasToContainer, 100);
+        }).catch(() => {});
+    } else {
+        document.exitFullscreen();
+    }
+}
+
+document.addEventListener('fullscreenchange', function () {
+    const area = document.querySelector('.annotation-canvas-area');
+    if (!document.fullscreenElement) {
+        area.classList.remove('is-fullscreen');
+        setTimeout(resizeCanvasToContainer, 100);
+    }
+});
+
+function resizeCanvasToContainer() {
+    if (!loadedImg) return;
+    const container = document.querySelector('.annotation-canvas-area');
+    const availW = container.clientWidth - 20;
+    const availH = container.clientHeight - 60;
+    const scaleW = availW / imgOrigW;
+    const scaleH = availH / imgOrigH;
+    const baseScale = Math.min(scaleW, scaleH);
+
+    // Sauvegarder les polygones en coordonnées originales
+    const savedPolys = polygons.map(p => ({
+        ...p,
+        points: p.points.map(pt => [pt[0] * scaleX, pt[1] * scaleY]),
+    }));
+    const savedCurrent = currentPoints.map(pt => [pt[0] * scaleX, pt[1] * scaleY]);
+
+    cW = Math.round(imgOrigW * baseScale);
+    cH = Math.round(imgOrigH * baseScale);
+    scaleX = imgOrigW / cW;
+    scaleY = imgOrigH / cH;
+
+    [canvasImage, canvasOverlay, canvasInteract].forEach(c => {
+        c.width = cW;
+        c.height = cH;
+    });
+
+    zoomLevel = 1;
+    panX = 0;
+    panY = 0;
+    applyTransform();
+    updateZoomLabel();
+
+    ctxImage.drawImage(loadedImg, 0, 0, cW, cH);
+
+    // Restaurer les polygones dans les nouvelles coordonnées
+    polygons = savedPolys.map(p => ({
+        ...p,
+        points: p.points.map(pt => [pt[0] / scaleX, pt[1] / scaleY]),
+    }));
+    currentPoints = savedCurrent.map(pt => [pt[0] / scaleX, pt[1] / scaleY]);
+
+    redraw();
+}
+
 // ── Sélection de classe ─────────────────────────────────────────────
 
 function selectClass(id, color, name) {
@@ -95,27 +264,33 @@ function selectClass(id, color, name) {
     document.querySelectorAll('.btn-class').forEach(b => {
         b.classList.toggle('active', parseInt(b.dataset.id) === id);
     });
-    document.getElementById('current-class-display').textContent = name.replace(/_/g, ' ');
-    document.getElementById('current-class-display').style.color = color;
+    const disp = document.getElementById('current-class-display');
+    if (disp) { disp.textContent = name.replace(/_/g, ' '); disp.style.color = color; }
 }
 
-// ── Dessin ──────────────────────────────────────────────────────────
+// ── Position souris → coordonnées canvas ────────────────────────────
 
 function getPos(e) {
     const rect = canvasInteract.getBoundingClientRect();
     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
     const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-    return { x: clientX - rect.left, y: clientY - rect.top };
+    // rect est déjà transformé par CSS, on convertit en coordonnées canvas internes
+    const x = (clientX - rect.left) * (cW / rect.width);
+    const y = (clientY - rect.top) * (cH / rect.height);
+    return { x, y };
 }
 
+// ── Dessin (clic) ───────────────────────────────────────────────────
+
 canvasInteract.addEventListener('click', function (e) {
+    if (isPanning || spaceHeld) return;
+
     const pos = getPos(e);
 
-    // Si on clique près du 1er point et qu'on a au moins 3 points → fermer
     if (currentPoints.length >= 3) {
         const first = currentPoints[0];
         const dist = Math.hypot(pos.x - first[0], pos.y - first[1]);
-        if (dist < CLOSE_RADIUS) {
+        if (dist < CLOSE_RADIUS / zoomLevel + 5) {
             closePolygon();
             return;
         }
@@ -128,9 +303,7 @@ canvasInteract.addEventListener('click', function (e) {
 
 canvasInteract.addEventListener('dblclick', function (e) {
     e.preventDefault();
-    if (currentPoints.length >= 3) {
-        closePolygon();
-    }
+    if (currentPoints.length >= 3) closePolygon();
 });
 
 canvasInteract.addEventListener('contextmenu', function (e) {
@@ -143,6 +316,7 @@ canvasInteract.addEventListener('contextmenu', function (e) {
 });
 
 canvasInteract.addEventListener('mousemove', function (e) {
+    if (isPanning) return;
     const pos = getPos(e);
     redrawInteraction(pos);
 });
@@ -184,7 +358,6 @@ function redraw() {
     polygons.forEach((poly, idx) => {
         if (poly.points.length < 3) return;
 
-        // Remplissage semi-transparent
         ctxOverlay.beginPath();
         ctxOverlay.moveTo(poly.points[0][0], poly.points[0][1]);
         for (let i = 1; i < poly.points.length; i++) {
@@ -193,13 +366,10 @@ function redraw() {
         ctxOverlay.closePath();
         ctxOverlay.fillStyle = hexToRgba(poly.color, 0.35);
         ctxOverlay.fill();
-
-        // Contour
         ctxOverlay.strokeStyle = poly.color;
         ctxOverlay.lineWidth = idx === selectedPolyIndex ? 3 : 2;
         ctxOverlay.stroke();
 
-        // Sommets
         poly.points.forEach(pt => {
             ctxOverlay.beginPath();
             ctxOverlay.arc(pt[0], pt[1], VERTEX_RADIUS, 0, Math.PI * 2);
@@ -210,7 +380,6 @@ function redraw() {
             ctxOverlay.stroke();
         });
 
-        // Label au centre
         const cx = poly.points.reduce((s, p) => s + p[0], 0) / poly.points.length;
         const cy = poly.points.reduce((s, p) => s + p[1], 0) / poly.points.length;
         ctxOverlay.font = 'bold 13px sans-serif';
@@ -230,26 +399,22 @@ function redrawInteraction(mousePos) {
     ctxInteract.clearRect(0, 0, cW, cH);
 
     if (currentPoints.length === 0) {
-        if (mousePos) drawCrosshair(mousePos);
+        if (mousePos && !spaceHeld) drawCrosshair(mousePos);
         return;
     }
 
-    // Lignes du polygone en cours
     ctxInteract.beginPath();
     ctxInteract.moveTo(currentPoints[0][0], currentPoints[0][1]);
     for (let i = 1; i < currentPoints.length; i++) {
         ctxInteract.lineTo(currentPoints[i][0], currentPoints[i][1]);
     }
-    if (mousePos) {
-        ctxInteract.lineTo(mousePos.x, mousePos.y);
-    }
+    if (mousePos) ctxInteract.lineTo(mousePos.x, mousePos.y);
     ctxInteract.strokeStyle = currentColor;
     ctxInteract.lineWidth = 2;
     ctxInteract.setLineDash([6, 4]);
     ctxInteract.stroke();
     ctxInteract.setLineDash([]);
 
-    // Points
     currentPoints.forEach((pt, i) => {
         ctxInteract.beginPath();
         const r = (i === 0 && currentPoints.length >= 3) ? CLOSE_RADIUS : VERTEX_RADIUS;
@@ -261,7 +426,6 @@ function redrawInteraction(mousePos) {
         ctxInteract.stroke();
     });
 
-    // Indication de fermeture
     if (currentPoints.length >= 3 && mousePos) {
         const first = currentPoints[0];
         const dist = Math.hypot(mousePos.x - first[0], mousePos.y - first[1]);
@@ -274,11 +438,11 @@ function redrawInteraction(mousePos) {
         }
     }
 
-    if (mousePos) drawCrosshair(mousePos);
+    if (mousePos && !spaceHeld) drawCrosshair(mousePos);
 }
 
 function drawCrosshair(pos) {
-    ctxInteract.strokeStyle = 'rgba(255,255,255,0.4)';
+    ctxInteract.strokeStyle = 'rgba(255,255,255,0.3)';
     ctxInteract.lineWidth = 1;
     ctxInteract.setLineDash([3, 3]);
     ctxInteract.beginPath();
@@ -312,7 +476,6 @@ function updatePolygonList() {
             <button class="btn-icon" onclick="event.stopPropagation();deletePolygon(${i})" title="Supprimer">✕</button>
         </div>`
     ).join('');
-
     document.getElementById('polygon-count').textContent = polygons.length;
 }
 
@@ -330,9 +493,7 @@ function deletePolygon(idx) {
 }
 
 function deleteSelected() {
-    if (selectedPolyIndex >= 0) {
-        deletePolygon(selectedPolyIndex);
-    }
+    if (selectedPolyIndex >= 0) deletePolygon(selectedPolyIndex);
 }
 
 function clearAll() {
@@ -368,8 +529,6 @@ function updateOpacity() {
 
 function saveAnnotation() {
     const filename = document.getElementById('annotation-image').value;
-
-    // Convertir les points en coordonnées originales
     const polyData = polygons.map(p => ({
         class_id: p.classId,
         class_name: p.className,
@@ -392,11 +551,8 @@ function saveAnnotation() {
     })
     .then(r => r.json())
     .then(data => {
-        if (data.success) {
-            showToast(`Sauvegardé : ${polygons.length} polygone(s) pour ${filename}`);
-        } else {
-            showToast(data.error || 'Erreur', 'error');
-        }
+        if (data.success) showToast(`Sauvegardé : ${polygons.length} polygone(s) pour ${filename}`);
+        else showToast(data.error || 'Erreur', 'error');
     });
 }
 
@@ -412,11 +568,8 @@ function trainModel() {
     .then(r => r.json())
     .then(data => {
         hideLoading();
-        if (data.success) {
-            showToast('Modèle entraîné ! Loss : ' + data.final_loss.toFixed(4));
-        } else {
-            showToast(data.error || 'Erreur', 'error');
-        }
+        if (data.success) showToast('Modèle entraîné ! Loss : ' + data.final_loss.toFixed(4));
+        else showToast(data.error || 'Erreur', 'error');
     })
     .catch(err => { hideLoading(); showToast('Erreur : ' + err, 'error'); });
 }
@@ -425,32 +578,23 @@ function trainModel() {
 
 document.addEventListener('keydown', function (e) {
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+    if (e.code === 'Space') { e.preventDefault(); return; }
     switch (e.key) {
-        case 'Enter':
-            if (currentPoints.length >= 3) closePolygon();
-            break;
+        case 'Enter': if (currentPoints.length >= 3) closePolygon(); break;
         case 'Escape':
-            currentPoints = [];
-            redrawInteraction();
-            break;
-        case 'z':
-            if (e.ctrlKey) undoLastPoint();
-            break;
-        case 'Delete':
-        case 'Backspace':
-            deleteSelected();
-            break;
-        case 's':
-            if (e.ctrlKey) { e.preventDefault(); saveAnnotation(); }
-            break;
+            if (document.fullscreenElement) { document.exitFullscreen(); break; }
+            currentPoints = []; redrawInteraction(); break;
+        case 'z': if (e.ctrlKey) { e.preventDefault(); undoLastPoint(); } break;
+        case 'Delete': case 'Backspace': deleteSelected(); break;
+        case 's': if (e.ctrlKey) { e.preventDefault(); saveAnnotation(); } break;
+        case 'f': toggleFullscreen(); break;
+        case '+': case '=': zoomIn(); break;
+        case '-': zoomOut(); break;
+        case '0': zoomReset(); break;
     }
 });
 
 // ── Init ────────────────────────────────────────────────────────────
 
-if (INITIAL_IMAGE) {
-    loadAnnotationImage();
-}
-if (SEG_CLASSES.length > 1) {
-    selectClass(SEG_CLASSES[1].id, SEG_CLASSES[1].color, SEG_CLASSES[1].name);
-}
+if (INITIAL_IMAGE) loadAnnotationImage();
+if (SEG_CLASSES.length > 1) selectClass(SEG_CLASSES[1].id, SEG_CLASSES[1].color, SEG_CLASSES[1].name);

@@ -589,6 +589,16 @@ input:focus, select:focus { border-color: var(--primary); }
     min-height: 600px;
     padding: 0.75rem;
     overflow: auto;
+    position: relative;
+}
+
+.annotation-canvas-area.is-fullscreen {
+    background: var(--bg);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
 }
 
 .canvas-wrapper {
@@ -598,10 +608,16 @@ input:focus, select:focus { border-color: var(--primary); }
     border-radius: 8px;
     overflow: hidden;
     border: 2px solid var(--border);
+    transform-origin: 0 0;
 }
 
 .canvas-wrapper canvas {
     display: block;
+}
+
+.is-fullscreen .canvas-wrapper {
+    border-radius: 0;
+    border: none;
 }
 
 #canvas-overlay, #canvas-interact {

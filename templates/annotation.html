@@ -75,6 +75,14 @@
             <p class="hint">Aucun polygone. Cliquez sur l'image pour commencer.</p>
         </div>
 
+        <h3 style="margin-top:1rem;">Zoom : <span id="zoom-label">100%</span></h3>
+        <div class="toolbar-actions" style="flex-direction:row;flex-wrap:wrap;">
+            <button class="btn btn-sm" onclick="zoomOut()">➖</button>
+            <button class="btn btn-sm" onclick="zoomReset()">1:1</button>
+            <button class="btn btn-sm" onclick="zoomIn()">➕</button>
+            <button class="btn btn-sm btn-primary" onclick="toggleFullscreen()">⛶ Plein écran (F)</button>
+        </div>
+
         <h3 style="margin-top:1rem;">Opacité : <span id="opacity-label">55</span>%</h3>
         <input type="range" id="overlay-opacity" min="10" max="100" value="55" oninput="updateOpacity()" style="width:100%">
 
