@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Documentation — Segmentation Embarcations{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Documentation</h1>
+    <p class="subtitle">Guide d'utilisation et analyse des verrous techniques</p>
+</div>
+
+<div class="card">
+    <div class="tab-bar">
+        <button class="tab active" onclick="showTab('utilisation', this)">📋 Utilisation</button>
+        <button class="tab" onclick="showTab('verrous', this)">⚠️ Verrous & Corrections</button>
+    </div>
+
+    <div id="tab-utilisation" class="tab-content active">
+        {{ docs.utilisation|safe }}
+    </div>
+
+    <div id="tab-verrous" class="tab-content" style="display:none;">
+        {{ docs.verrous|safe }}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function showTab(tabId, btn) {
+    document.querySelectorAll('.tab-content').forEach(tc => tc.style.display = 'none');
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.getElementById('tab-' + tabId).style.display = '';
+    btn.classList.add('active');
+}
+</script>
+{% endblock %}

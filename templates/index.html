@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block title %}Accueil — Segmentation Embarcations{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Segmentation & Clustering d'Embarcations</h1>
+    <p class="subtitle">Pipeline complet : extraction de features, clustering, étiquetage et analyse par régions</p>
+</div>
+
+<div class="dashboard-grid">
+    <div class="card stat-card">
+        <div class="stat-icon">🖼️</div>
+        <div class="stat-info">
+            <span class="stat-value">{{ n_images }}</span>
+            <span class="stat-label">Images dans le dataset</span>
+        </div>
+    </div>
+
+    <div class="card stat-card">
+        <div class="stat-icon">🏷️</div>
+        <div class="stat-info">
+            <span class="stat-value">{{ n_labeled }}</span>
+            <span class="stat-label">Images étiquetées</span>
+        </div>
+    </div>
+
+    <div class="card stat-card">
+        <div class="stat-icon">🧠</div>
+        <div class="stat-info">
+            <span class="stat-value">{{ "✅" if has_embeddings else "❌" }}</span>
+            <span class="stat-label">Embeddings ({{ method or "—" }})</span>
+        </div>
+    </div>
+
+    <div class="card stat-card">
+        <div class="stat-icon">📊</div>
+        <div class="stat-info">
+            <span class="stat-value">{{ "✅" if has_clusters else "❌" }}</span>
+            <span class="stat-label">Clusters calculés</span>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <h2>Pipeline de travail</h2>
+    <div class="pipeline-steps">
+        <div class="step {{ 'done' if n_images > 0 else '' }}">
+            <div class="step-number">1</div>
+            <div class="step-content">
+                <h3>Images chargées</h3>
+                <p>{{ n_images }} images d'embarcations dans le dataset</p>
+            </div>
+        </div>
+        <div class="step {{ 'done' if has_embeddings else '' }}">
+            <div class="step-number">2</div>
+            <div class="step-content">
+                <h3>Extraction d'embeddings</h3>
+                <p>CNN pré-entraîné (ResNet-18) ou auto-encodeur convolutionnel</p>
+                <a href="{{ url_for('clustering_page') }}" class="btn btn-sm">Lancer →</a>
+            </div>
+        </div>
+        <div class="step {{ 'done' if has_clusters else '' }}">
+            <div class="step-number">3</div>
+            <div class="step-content">
+                <h3>Clustering</h3>
+                <p>K-Means / DBSCAN avec visualisation UMAP</p>
+                <a href="{{ url_for('clustering_page') }}" class="btn btn-sm">Visualiser →</a>
+            </div>
+        </div>
+        <div class="step {{ 'done' if n_labeled > 0 else '' }}">
+            <div class="step-number">4</div>
+            <div class="step-content">
+                <h3>Étiquetage & corrections</h3>
+                <p>Labels manuels, suggestions par similarité, corrections en masse</p>
+                <a href="{{ url_for('labeling_page') }}" class="btn btn-sm">Étiqueter →</a>
+            </div>
+        </div>
+        <div class="step">
+            <div class="step-number">5</div>
+            <div class="step-content">
+                <h3>Analyse par régions</h3>
+                <p>Superpixels SLIC, contours, détection d'anomalies locales</p>
+                <a href="{{ url_for('regions_page') }}" class="btn btn-sm">Explorer →</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <h2>Catégories d'embarcations cibles</h2>
+    <div class="label-chips">
+        <span class="chip">🚤 Bateau moteur</span>
+        <span class="chip">⛵ Voilier</span>
+        <span class="chip">🏄 Paddle</span>
+        <span class="chip">🛶 Kayak</span>
+        <span class="chip">🛟 Gonflable</span>
+        <span class="chip">💨 Jet ski</span>
+        <span class="chip">🚣 Barque</span>
+        <span class="chip">❓ Autre</span>
+    </div>
+</div>
+{% endblock %}

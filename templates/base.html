@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Segmentation Embarcations{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    {% block head %}{% endblock %}
+</head>
+<body>
+    <nav class="sidebar">
+        <div class="sidebar-header">
+            <h2>⛵ SegFlask</h2>
+            <span class="version">v1.0</span>
+        </div>
+        <ul class="nav-links">
+            <li><a href="{{ url_for('index') }}" class="{% if request.endpoint == 'index' %}active{% endif %}">
+                <span class="nav-icon">🏠</span> Accueil
+            </a></li>
+            <li><a href="{{ url_for('clustering_page') }}" class="{% if request.endpoint == 'clustering_page' %}active{% endif %}">
+                <span class="nav-icon">📊</span> Clustering
+            </a></li>
+            <li><a href="{{ url_for('labeling_page') }}" class="{% if request.endpoint == 'labeling_page' %}active{% endif %}">
+                <span class="nav-icon">🏷️</span> Étiquetage
+            </a></li>
+            <li><a href="{{ url_for('corrections_page') }}" class="{% if request.endpoint == 'corrections_page' %}active{% endif %}">
+                <span class="nav-icon">✏️</span> Corrections
+            </a></li>
+            <li><a href="{{ url_for('regions_page') }}" class="{% if request.endpoint == 'regions_page' %}active{% endif %}">
+                <span class="nav-icon">🔍</span> Régions
+            </a></li>
+
+            <li class="nav-separator"><span>Segmentation</span></li>
+
+            <li><a href="{{ url_for('annotation_page') }}" class="{% if request.endpoint == 'annotation_page' %}active{% endif %}">
+                <span class="nav-icon">🎨</span> Annotation
+            </a></li>
+            <li><a href="{{ url_for('prediction_page') }}" class="{% if request.endpoint == 'prediction_page' %}active{% endif %}">
+                <span class="nav-icon">🔮</span> Prédiction
+            </a></li>
+            <li><a href="{{ url_for('documentation_page') }}" class="{% if request.endpoint == 'documentation_page' %}active{% endif %}">
+                <span class="nav-icon">📖</span> Documentation
+            </a></li>
+        </ul>
+        <div class="sidebar-footer">
+            <button id="theme-toggle" class="btn btn-sm" onclick="toggleTheme()">🌙 Thème</button>
+        </div>
+    </nav>
+
+    <main class="content">
+        {% block content %}{% endblock %}
+    </main>
+
+    <div id="toast-container"></div>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

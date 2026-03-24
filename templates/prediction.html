@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block title %}Prédiction — Segmentation Embarcations{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Prédiction automatique</h1>
+    <p class="subtitle">Le modèle segmente l'image automatiquement grâce à vos annotations</p>
+</div>
+
+{% if not model_ready %}
+<div class="card">
+    <div class="placeholder-text" style="flex-direction:column;gap:1rem;">
+        <p style="font-size:1.2rem;">🧠 Modèle non entraîné</p>
+        <p>Annotez au moins 3 images dans l'onglet <a href="{{ url_for('annotation_page') }}">Annotation</a>,
+        puis lancez l'entraînement pour pouvoir utiliser la prédiction automatique.</p>
+        <a href="{{ url_for('annotation_page') }}" class="btn btn-primary">Aller à l'annotation →</a>
+    </div>
+</div>
+{% else %}
+
+<div class="card">
+    <h2>Choisir une image</h2>
+    <div class="form-row">
+        <div class="form-group">
+            <label>Image</label>
+            <select id="predict-image">
+                {% for img in images %}
+                <option value="{{ img }}">{{ img }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button class="btn btn-primary" onclick="runPrediction()">🔮 Segmenter automatiquement</button>
+    </div>
+</div>
+
+<div class="card" id="prediction-results" style="display:none;">
+    <h2>Résultat</h2>
+    <div class="region-comparison">
+        <div class="region-panel">
+            <h3>Image originale</h3>
+            <img id="pred-original" src="">
+        </div>
+        <div class="region-panel">
+            <h3>Segmentation prédite</h3>
+            <img id="pred-mask" src="">
+        </div>
+        <div class="region-panel">
+            <h3>Superposition</h3>
+            <img id="pred-overlay" src="">
+        </div>
+    </div>
+
+    <h3 style="margin-top:1rem;">Légende</h3>
+    <div class="label-chips">
+        {% for cls in classes %}
+        <span class="chip" style="border-color:{{ cls.color }};">
+            <span class="cls-dot" style="background:{{ cls.color }};"></span>
+            {{ cls.name | replace('_', ' ') | title }}
+        </span>
+        {% endfor %}
+    </div>
+
+    <div id="pred-stats" class="region-stats" style="margin-top:1rem;"></div>
+</div>
+
+<div id="loading-overlay" class="loading-overlay hidden">
+    <div class="spinner"></div>
+    <p>Segmentation en cours…</p>
+</div>
+
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+function runPrediction() {
+    const filename = document.getElementById('predict-image').value;
+    showLoading('Segmentation de ' + filename + '…');
+
+    fetch('/api/predict-segmentation', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({filename: filename})
+    })
+    .then(r => r.json())
+    .then(data => {
+        hideLoading();
+        if (data.error) { showToast(data.error, 'error'); return; }
+
+        document.getElementById('prediction-results').style.display = '';
+        document.getElementById('pred-original').src = 'data:image/png;base64,' + data.original_b64;
+        document.getElementById('pred-mask').src = 'data:image/png;base64,' + data.mask_b64;
+        document.getElementById('pred-overlay').src = 'data:image/png;base64,' + data.overlay_b64;
+
+        let statsHtml = '';
+        if (data.class_percentages) {
+            for (const [name, pct] of Object.entries(data.class_percentages)) {
+                if (pct > 0.5) {
+                    statsHtml += `<div class="stat-row">
+                        <span class="stat-label">${name.replace(/_/g, ' ')}</span>
+                        <span class="stat-value">${pct.toFixed(1)}%</span>
+                    </div>`;
+                }
+            }
+        }
+        document.getElementById('pred-stats').innerHTML = statsHtml;
+    })
+    .catch(err => { hideLoading(); showToast('Erreur: ' + err, 'error'); });
+}
+</script>
+{% endblock %}

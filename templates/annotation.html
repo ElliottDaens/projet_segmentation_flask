@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}Annotation — Segmentation Embarcations{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Annotation par zones</h1>
+    <p class="subtitle">Dessinez sur l'image pour apprendre à l'ordinateur ce que c'est : eau, terre, bateau…</p>
+</div>
+
+<div class="annotation-layout">
+    <!-- Barre d'outils gauche -->
+    <div class="card annotation-toolbar">
+        <h3>Image</h3>
+        <select id="annotation-image" onchange="loadAnnotationImage()">
+            {% for img in images %}
+            <option value="{{ img }}" {{ 'selected' if img == selected_image }}>{{ img }}</option>
+            {% endfor %}
+        </select>
+
+        <h3 style="margin-top:1rem;">Classes</h3>
+        <div class="class-buttons" id="class-buttons">
+            {% for cls in classes %}
+            <button class="btn-class {{ 'active' if cls.id == 0 }}"
+                    data-id="{{ cls.id }}" data-color="{{ cls.color }}"
+                    style="--cls-color: {{ cls.color }}"
+                    onclick="selectClass({{ cls.id }}, '{{ cls.color }}')">
+                <span class="cls-dot" style="background:{{ cls.color }}"></span>
+                {{ cls.name | replace('_', ' ') | title }}
+            </button>
+            {% endfor %}
+        </div>
+
+        <h3 style="margin-top:1rem;">Pinceau</h3>
+        <div class="form-group">
+            <label>Taille : <span id="brush-size-label">20</span>px</label>
+            <input type="range" id="brush-size" min="2" max="80" value="20" oninput="updateBrushSize()">
+        </div>
+        <div class="form-group">
+            <label>Opacité overlay : <span id="opacity-label">60</span>%</label>
+            <input type="range" id="overlay-opacity" min="10" max="100" value="60" oninput="updateOpacity()">
+        </div>
+
+        <h3 style="margin-top:1rem;">Actions</h3>
+        <div class="toolbar-actions">
+            <button class="btn btn-secondary" onclick="undoStroke()">↩ Annuler</button>
+            <button class="btn btn-secondary" onclick="clearCanvas()">🗑 Effacer tout</button>
+            <button class="btn btn-primary" onclick="saveMask()">💾 Sauvegarder</button>
+        </div>
+
+        <div class="annotation-stats" style="margin-top:1rem;">
+            <p><strong>{{ n_annotated }}</strong> / {{ n_total }} images annotées</p>
+            <div class="progress-bar">
+                <div class="progress-fill" style="width:{{ (n_annotated / n_total * 100) if n_total > 0 else 0 }}%"></div>
+            </div>
+            {% if n_annotated >= 3 %}
+            <button class="btn btn-primary" style="margin-top:0.5rem;width:100%" onclick="trainModel()">
+                🧠 Entraîner le modèle ({{ n_annotated }} masques)
+            </button>
+            {% else %}
+            <p class="hint">Annotez au moins 3 images pour entraîner le modèle.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Zone de dessin -->
+    <div class="card annotation-canvas-container">
+        <div class="canvas-wrapper" id="canvas-wrapper">
+            <canvas id="canvas-image"></canvas>
+            <canvas id="canvas-overlay"></canvas>
+            <canvas id="canvas-cursor" style="pointer-events:none;"></canvas>
+        </div>
+        <div id="canvas-hint" class="hint">Chargement de l'image…</div>
+    </div>
+</div>
+
+<div id="loading-overlay" class="loading-overlay hidden">
+    <div class="spinner"></div>
+    <p id="loading-text">Traitement en cours…</p>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const SEG_CLASSES = {{ classes | tojson }};
+    const INITIAL_IMAGE = '{{ selected_image }}';
+</script>
+<script src="{{ url_for('static', filename='js/annotation.js') }}"></script>
+{% endblock %}

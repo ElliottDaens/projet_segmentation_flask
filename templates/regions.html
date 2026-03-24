@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}Régions — Segmentation Embarcations{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Analyse par régions</h1>
+    <p class="subtitle">Superpixels SLIC, détection de contours et anomalies locales</p>
+</div>
+
+<div class="card">
+    <h2>Sélection & paramètres</h2>
+    <div class="form-row">
+        <div class="form-group">
+            <label>Image</label>
+            <select id="region-image">
+                {% for img in images %}
+                <option value="{{ img }}">{{ img }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Nombre de superpixels</label>
+            <input type="number" id="n-segments" value="100" min="10" max="500">
+        </div>
+        <div class="form-group">
+            <label>Clusters de régions</label>
+            <input type="number" id="n-region-clusters" value="5" min="2" max="15">
+        </div>
+        <button class="btn btn-primary" onclick="analyzeRegions()">Analyser</button>
+    </div>
+</div>
+
+<div class="card" id="region-results" style="display:none;">
+    <h2>Résultats</h2>
+    <div class="region-comparison">
+        <div class="region-panel">
+            <h3>Image originale</h3>
+            <img id="region-original" src="" alt="Original">
+        </div>
+        <div class="region-panel">
+            <h3>Superpixels + anomalies</h3>
+            <img id="region-overlay" src="" alt="Overlay">
+        </div>
+        <div class="region-panel">
+            <h3>Détection de contours</h3>
+            <img id="region-contours" src="" alt="Contours">
+        </div>
+    </div>
+    <div class="region-stats" id="region-stats"></div>
+</div>
+
+<div id="loading-overlay" class="loading-overlay hidden">
+    <div class="spinner"></div>
+    <p>Analyse en cours…</p>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function analyzeRegions() {
+    const filename = document.getElementById('region-image').value;
+    const nSegments = parseInt(document.getElementById('n-segments').value);
+    const nClusters = parseInt(document.getElementById('n-region-clusters').value);
+
+    showLoading('Analyse des régions…');
+
+    fetch('/api/analyze-regions', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({filename, n_segments: nSegments, n_clusters: nClusters})
+    })
+    .then(r => r.json())
+    .then(data => {
+        hideLoading();
+        if (data.error) { showToast(data.error, 'error'); return; }
+
+        document.getElementById('region-results').style.display = '';
+        document.getElementById('region-original').src = 'data:image/png;base64,' + data.original_b64;
+        document.getElementById('region-overlay').src = 'data:image/png;base64,' + data.overlay_b64;
+        document.getElementById('region-contours').src = 'data:image/png;base64,' + data.contours_b64;
+
+        document.getElementById('region-stats').innerHTML = `
+            <div class="stat-row">
+                <span class="stat-label">Régions détectées</span>
+                <span class="stat-value">${data.n_regions}</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Anomalies détectées</span>
+                <span class="stat-value" style="color:var(--danger)">${data.n_anomalies}</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Clusters de régions</span>
+                <span class="stat-value">${data.n_region_clusters}</span>
+            </div>
+        `;
+    })
+    .catch(err => { hideLoading(); showToast('Erreur: ' + err, 'error'); });
+}
+</script>
+{% endblock %}

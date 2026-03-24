@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block title %}Clustering — Segmentation Embarcations{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Clustering & Visualisation</h1>
+    <p class="subtitle">Extraction d'embeddings, réduction de dimension et clustering</p>
+</div>
+
+<!-- Étape 1 : Embeddings -->
+<div class="card">
+    <h2>1. Extraction d'embeddings</h2>
+    <div class="form-row">
+        <div class="form-group">
+            <label>Méthode</label>
+            <select id="embedding-method">
+                <option value="cnn">CNN pré-entraîné (ResNet-18)</option>
+                <option value="autoencoder">Auto-encodeur convolutionnel</option>
+            </select>
+        </div>
+        <button class="btn btn-primary" id="btn-compute-embeddings" onclick="computeEmbeddings()">
+            Calculer les embeddings
+        </button>
+    </div>
+    <div id="embedding-status" class="status-box">
+        {% if state.embeddings is not none %}
+            <span class="status-ok">✅ Embeddings calculés ({{ state.method }}) — {{ state.filenames|length }} images, {{ state.embeddings.shape[1] }}D</span>
+        {% else %}
+            <span class="status-waiting">En attente du calcul…</span>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Étape 2 : Clustering -->
+<div class="card">
+    <h2>2. Clustering</h2>
+    <div class="form-row">
+        <div class="form-group">
+            <label>Algorithme</label>
+            <select id="clustering-method">
+                <option value="kmeans">K-Means</option>
+                <option value="dbscan">DBSCAN</option>
+            </select>
+        </div>
+        <div class="form-group" id="kmeans-params">
+            <label>Nombre de clusters (K)</label>
+            <input type="number" id="n-clusters" value="{{ n_clusters_default }}" min="2" max="10">
+        </div>
+        <div class="form-group hidden" id="dbscan-params">
+            <label>Epsilon</label>
+            <input type="number" id="dbscan-eps" value="0.5" step="0.1" min="0.1">
+            <label>Min samples</label>
+            <input type="number" id="dbscan-min-samples" value="2" min="1">
+        </div>
+        <button class="btn btn-primary" onclick="runClustering()">Lancer le clustering</button>
+        <button class="btn btn-secondary" onclick="runSemiSupervised()">Semi-supervisé</button>
+    </div>
+</div>
+
+<!-- Résultats -->
+<div class="card" id="results-section" style="{{ '' if state.cluster_report else 'display:none' }}">
+    <h2>3. Résultats</h2>
+    <div class="results-grid">
+        <div class="result-panel">
+            <h3>Scatter plot UMAP</h3>
+            <div id="scatter-plot" style="width:100%;height:500px;"></div>
+        </div>
+        <div class="result-panel">
+            <h3>Métriques</h3>
+            <div id="metrics-panel" class="metrics-list"></div>
+            <h3 style="margin-top:1rem;">K optimal (coude)</h3>
+            <div id="elbow-plot" style="width:100%;height:300px;"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Grille d'images par cluster -->
+<div class="card" id="cluster-grid-section" style="{{ '' if state.cluster_report else 'display:none' }}">
+    <h2>4. Images par cluster</h2>
+    <div id="cluster-tabs" class="tab-bar"></div>
+    <div id="cluster-grid" class="image-grid"></div>
+</div>
+
+<div id="loading-overlay" class="loading-overlay hidden">
+    <div class="spinner"></div>
+    <p id="loading-text">Traitement en cours…</p>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('clustering-method').addEventListener('change', function() {
+    document.getElementById('kmeans-params').classList.toggle('hidden', this.value !== 'kmeans');
+    document.getElementById('dbscan-params').classList.toggle('hidden', this.value !== 'dbscan');
+});
+
+{% if state.cluster_report %}
+renderResults({{ state.cluster_report|tojson }}, {{ state.metrics|tojson }}, {{ state.optimal_k|tojson if state.optimal_k else 'null' }});
+{% endif %}
+</script>
+{% endblock %}
