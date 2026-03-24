@@ -38,8 +38,8 @@ function loadAnnotationImage() {
 
         const wrapper = document.getElementById('canvas-wrapper');
         const maxW = wrapper.clientWidth - 4;
-        const maxH = window.innerHeight - 160;
-        const scale = Math.min(maxW / imgOrigW, maxH / imgOrigH, 1.5);
+        // L'image prend toute la largeur disponible, sans plafond de zoom
+        const scale = maxW / imgOrigW;
         cW = Math.round(imgOrigW * scale);
         cH = Math.round(imgOrigH * scale);
         scaleX = imgOrigW / cW;
