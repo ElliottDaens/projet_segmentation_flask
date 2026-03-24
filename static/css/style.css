@@ -828,6 +828,59 @@ input:focus, select:focus { border-color: var(--primary); }
     font-size: 0.82rem;
 }
 
+/* ── Detection cards ───────────────────────────────────────────── */
+
+.detection-card {
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+}
+
+.detection-card.rejected { opacity: 0.6; }
+
+.det-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+}
+
+.det-conf { font-weight: 700; font-size: 1rem; }
+
+.det-scores { display: flex; flex-direction: column; gap: 0.25rem; }
+
+.score-bar {
+    display: grid;
+    grid-template-columns: 70px 1fr 40px;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+}
+
+.score-bar .bar {
+    height: 6px;
+    background: var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.score-bar .bar div {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.3s;
+}
+
+.det-explain {
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+    margin-top: 0.4rem;
+    font-style: italic;
+}
+
 /* ── Utilitaires ───────────────────────────────────────────────── */
 
 .hidden { display: none !important; }

@@ -7,6 +7,27 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/lang/fr/).
 
 ---
 
+## [3.0.0] — 2026-03-24
+
+### Ajouté
+- **Segmentation hiérarchique en 2 niveaux** : découpe mer/terre/ciel (niveau 1) puis détection d'objets par zone (niveau 2)
+- **Système de voisinage complet** avec 4 scores : modèle, zone, voisinage spatial, taille
+- **Score de confiance combiné** pondéré + filtrage automatique des détections peu fiables
+- **Classes conditionnelles** : seules les classes annotées par l'utilisateur sont détectées
+- **Logique zone → objets** : un bateau n'est cherché que dans la mer, jamais dans le ciel
+- **Barres de score visuelles** par détection dans l'interface de prédiction
+- **Explications textuelles** pour chaque détection (pourquoi acceptée/rejetée)
+- `models/hierarchical.py` — pipeline complet de prédiction hiérarchique
+- `clustering/neighborhood.py` — analyse de voisinage spatial, sémantique, taille
+- Documentation Markdown intégrée (onglet Hiérarchique & Voisinage)
+
+### Modifié
+- Page Prédiction entièrement réécrite pour afficher zones + objets + scores
+- Mode plein écran (F) + zoom molette + pan (Espace+clic) sur l'annotation
+- Images d'annotation agrandies, occupent tout l'espace disponible
+
+---
+
 ## [2.0.0] — 2026-03-24
 
 ### Ajouté

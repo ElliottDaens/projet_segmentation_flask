@@ -3,39 +3,35 @@
 
 {% block content %}
 <div class="page-header">
-    <h1>Prédiction automatique</h1>
-    <p class="subtitle">Le modèle segmente l'image automatiquement grâce à vos annotations</p>
+    <h1>Prédiction hiérarchique</h1>
+    <p class="subtitle">Segmentation automatique : zones (mer/terre/ciel) → objets par zone → voisinage</p>
 </div>
 
 <div class="tuto-box" data-tuto-id="prediction">
     <div class="tuto-header" onclick="toggleTuto(this)">
         <span>📘</span>
-        <h3>Comprendre la prédiction — L'ordinateur fait seul</h3>
+        <h3>Comprendre la prédiction hiérarchique</h3>
         <span class="tuto-toggle">▼</span>
     </div>
     <div class="tuto-body">
-        <h4>C'est quoi ?</h4>
-        <p>C'est le <strong>résultat final</strong> de tout ton travail. Le modèle U-Net que tu as entraîné avec tes annotations est maintenant capable de <strong>segmenter automatiquement</strong> une image qu'il n'a jamais vue.</p>
-        <p>Il va colorier chaque pixel de l'image avec la classe qu'il pense reconnaître : bleu pour l'eau, marron pour la terre, rouge pour un bateau moteur, etc.</p>
-
-        <h4>Comment ça marche en coulisses ?</h4>
+        <h4>Comment ça marche ?</h4>
         <ol>
-            <li>L'image est redimensionnée à 256×256 pixels.</li>
-            <li>Elle passe dans le <strong>réseau U-Net</strong> (encodeur ResNet-18 + décodeur).</li>
-            <li>Pour chaque pixel, le réseau prédit la probabilité de chaque classe.</li>
-            <li>La classe avec la plus haute probabilité est choisie → le masque de segmentation.</li>
+            <li><strong>Étape 1 — Zones de scène</strong> : le modèle découpe l'image en 3 grandes zones : <strong style="color:#0077FF">mer</strong>, <strong style="color:#8B5A2B">terre</strong>, <strong style="color:#87CEEB">ciel</strong>.</li>
+            <li><strong>Étape 2 — Détection d'objets par zone</strong> : dans chaque zone, il cherche uniquement les objets pertinents (bateaux dans la mer, pas dans le ciel). Il ne cherche que les classes que <strong>tu as annotées</strong>.</li>
+            <li><strong>Étape 3 — Voisinage</strong> : chaque détection est analysée avec 4 critères :
+                <ul>
+                    <li><strong>Score modèle</strong> — confiance du réseau de neurones</li>
+                    <li><strong>Score zone</strong> — l'objet est-il bien dans la bonne zone ? (bateau dans la mer = OK)</li>
+                    <li><strong>Score voisinage</strong> — les voisins sont-ils cohérents ?</li>
+                    <li><strong>Score taille</strong> — la taille est-elle raisonnable ?</li>
+                </ul>
+            </li>
+            <li><strong>Étape 4 — Filtrage</strong> : les détections avec un score de confiance trop faible sont rejetées.</li>
         </ol>
 
-        <h4>Comment lire les résultats ?</h4>
-        <ul>
-            <li><strong>Image originale</strong> — Pour comparaison.</li>
-            <li><strong>Segmentation prédite</strong> — Chaque couleur = une classe. Consulte la légende en dessous.</li>
-            <li><strong>Superposition</strong> — L'image originale avec le masque semi-transparent par-dessus. Permet de voir si les zones correspondent bien.</li>
-            <li><strong>Pourcentages</strong> — La proportion de l'image occupée par chaque classe.</li>
-        </ul>
-
-        <h4>Si les résultats sont mauvais ?</h4>
-        <div class="tip">C'est normal au début ! Pour améliorer : annote <strong>plus d'images</strong> (plus il y a d'exemples, mieux c'est), annote <strong>plus précisément</strong> (polygones bien ajustés aux bords), et relance l'entraînement. Avec 5-10 images bien annotées, les résultats s'améliorent significativement.</div>
+        <h4>Classes actives</h4>
+        <p>Le système ne détecte que les classes que tu as annotées. Si tu n'as jamais dessiné de « paddle », il ne cherchera pas de paddle.</p>
+        <div class="tip">Pour activer une nouvelle classe, va dans <strong>Annotation</strong> et dessine au moins un polygone de cette classe sur une image.</div>
     </div>
 </div>
 
@@ -44,14 +40,33 @@
     <div class="placeholder-text" style="flex-direction:column;gap:1rem;">
         <p style="font-size:1.2rem;">🧠 Modèle non entraîné</p>
         <p>Annotez au moins 3 images dans l'onglet <a href="{{ url_for('annotation_page') }}">Annotation</a>,
-        puis lancez l'entraînement pour pouvoir utiliser la prédiction automatique.</p>
+        puis lancez l'entraînement.</p>
         <a href="{{ url_for('annotation_page') }}" class="btn btn-primary">Aller à l'annotation →</a>
     </div>
 </div>
 {% else %}
 
+<!-- Classes annotées -->
 <div class="card">
-    <h2>Choisir une image</h2>
+    <h3>Classes actives (annotées)</h3>
+    <div class="label-chips" style="margin-bottom:0.5rem;">
+        <span class="chip" style="border-color:#0077FF"><span class="cls-dot" style="background:#0077FF"></span> Mer</span>
+        <span class="chip" style="border-color:#8B5A2B"><span class="cls-dot" style="background:#8B5A2B"></span> Terre</span>
+        <span class="chip" style="border-color:#87CEEB"><span class="cls-dot" style="background:#87CEEB"></span> Ciel</span>
+        {% for obj_name in annotated_objects %}
+            {% set cls = classes | selectattr('name', 'eq', obj_name) | first %}
+            {% if cls %}
+            <span class="chip" style="border-color:{{ cls.color }}"><span class="cls-dot" style="background:{{ cls.color }}"></span> {{ cls.name | replace('_',' ') | title }}</span>
+            {% endif %}
+        {% endfor %}
+    </div>
+    {% if not annotated_objects %}
+    <p class="hint">Aucune classe d'objet annotée. Le modèle ne détectera que les zones (mer/terre/ciel). Annotez des objets (bateaux, etc.) pour les détecter.</p>
+    {% endif %}
+</div>
+
+<div class="card">
+    <h2>Lancer la prédiction</h2>
     <div class="form-row">
         <div class="form-group">
             <label>Image</label>
@@ -61,25 +76,49 @@
                 {% endfor %}
             </select>
         </div>
-        <button class="btn btn-primary" onclick="runPrediction()">🔮 Segmenter automatiquement</button>
+        <button class="btn btn-primary" onclick="runPrediction()">🔮 Segmenter (hiérarchique)</button>
     </div>
 </div>
 
+<!-- Résultats -->
 <div class="card" id="prediction-results" style="display:none;">
     <h2>Résultat</h2>
-    <div class="region-comparison">
+
+    <h3>Niveau 1 — Zones de scène</h3>
+    <div class="region-comparison" style="grid-template-columns: 1fr 1fr;">
         <div class="region-panel">
-            <h3>Image originale</h3>
+            <h4>Image originale</h4>
             <img id="pred-original" src="">
         </div>
         <div class="region-panel">
-            <h3>Segmentation prédite</h3>
-            <img id="pred-mask" src="">
+            <h4>Zones mer / terre / ciel</h4>
+            <img id="pred-zones" src="">
+        </div>
+    </div>
+    <div id="zone-stats" class="region-stats" style="margin-top:0.5rem;"></div>
+
+    <h3 style="margin-top:1.5rem;">Niveau 2 — Objets détectés + voisinage</h3>
+    <div class="region-comparison" style="grid-template-columns: 1fr 1fr;">
+        <div class="region-panel">
+            <h4>Segmentation complète</h4>
+            <img id="pred-full" src="">
         </div>
         <div class="region-panel">
-            <h3>Superposition</h3>
+            <h4>Overlay + détections</h4>
             <img id="pred-overlay" src="">
         </div>
+    </div>
+
+    <!-- Détections acceptées -->
+    <div id="detections-section" style="margin-top:1rem;">
+        <h3>Détections acceptées</h3>
+        <div id="detections-list"></div>
+    </div>
+
+    <!-- Détections rejetées -->
+    <div id="rejected-section" style="margin-top:1rem;">
+        <h3 style="color:var(--text-secondary)">Détections rejetées (confiance insuffisante)</h3>
+        <div id="rejected-list"></div>
     </div>
 
     <h3 style="margin-top:1rem;">Légende</h3>
@@ -91,13 +130,11 @@
         </span>
         {% endfor %}
     </div>
-
-    <div id="pred-stats" class="region-stats" style="margin-top:1rem;"></div>
 </div>
 
 <div id="loading-overlay" class="loading-overlay hidden">
     <div class="spinner"></div>
-    <p>Segmentation en cours…</p>
+    <p>Segmentation hiérarchique en cours…</p>
 </div>
 
 {% endif %}
@@ -107,7 +144,7 @@
 <script>
 function runPrediction() {
     const filename = document.getElementById('predict-image').value;
-    showLoading('Segmentation de ' + filename + '…');
+    showLoading('Segmentation hiérarchique de ' + filename + '…');
 
     fetch('/api/predict-segmentation', {
         method: 'POST',
@@ -121,23 +158,67 @@ function runPrediction() {
 
         document.getElementById('prediction-results').style.display = '';
         document.getElementById('pred-original').src = 'data:image/png;base64,' + data.original_b64;
-        document.getElementById('pred-mask').src = 'data:image/png;base64,' + data.mask_b64;
+        document.getElementById('pred-zones').src = 'data:image/png;base64,' + data.zones_b64;
+        document.getElementById('pred-full').src = 'data:image/png;base64,' + data.full_b64;
         document.getElementById('pred-overlay').src = 'data:image/png;base64,' + data.overlay_b64;
 
-        let statsHtml = '';
-        if (data.class_percentages) {
-            for (const [name, pct] of Object.entries(data.class_percentages)) {
-                if (pct > 0.5) {
-                    statsHtml += `<div class="stat-row">
-                        <span class="stat-label">${name.replace(/_/g, ' ')}</span>
-                        <span class="stat-value">${pct.toFixed(1)}%</span>
-                    </div>`;
-                }
+        // Statistiques des zones
+        let zoneHtml = '';
+        if (data.zone_stats) {
+            for (const [name, stats] of Object.entries(data.zone_stats)) {
+                zoneHtml += `<div class="stat-row">
+                    <span class="stat-label"><span class="cls-dot" style="background:${stats.color};display:inline-block;vertical-align:middle;margin-right:4px;"></span>${name}</span>
+                    <span class="stat-value">${stats.pourcentage}%</span>
+                </div>`;
             }
         }
-        document.getElementById('pred-stats').innerHTML = statsHtml;
+        document.getElementById('zone-stats').innerHTML = zoneHtml;
+
+        // Détections acceptées
+        let detHtml = '';
+        if (data.detections && data.detections.length > 0) {
+            data.detections.forEach(d => {
+                detHtml += renderDetection(d, true);
+            });
+        } else {
+            detHtml = '<p class="hint">Aucun objet détecté avec confiance suffisante.</p>';
+        }
+        document.getElementById('detections-list').innerHTML = detHtml;
+
+        // Détections rejetées
+        let rejHtml = '';
+        if (data.rejected && data.rejected.length > 0) {
+            data.rejected.forEach(d => {
+                rejHtml += renderDetection(d, false);
+            });
+            document.getElementById('rejected-section').style.display = '';
+        } else {
+            document.getElementById('rejected-section').style.display = 'none';
+        }
+        document.getElementById('rejected-list').innerHTML = rejHtml;
+
+        showToast(`${data.n_accepted} objet(s) détecté(s), ${data.n_rejected} rejeté(s)`);
     })
     .catch(err => { hideLoading(); showToast('Erreur: ' + err, 'error'); });
+}
+
+function renderDetection(d, accepted) {
+    const barColor = accepted ? 'var(--primary)' : 'var(--text-secondary)';
+    return `<div class="detection-card ${accepted ? '' : 'rejected'}">
+        <div class="det-header">
+            <strong>${d.class_name.replace(/_/g, ' ')}</strong>
+            <span class="det-conf" style="color:${accepted ? 'var(--success)' : 'var(--danger)'}">
+                ${Math.round(d.confiance * 100)}%
+            </span>
+        </div>
+        <div class="det-scores">
+            <div class="score-bar"><span>Modèle</span><div class="bar"><div style="width:${d.score_modele*100}%;background:${barColor}"></div></div><span>${Math.round(d.score_modele*100)}%</span></div>
+            <div class="score-bar"><span>Zone</span><div class="bar"><div style="width:${d.score_zone*100}%;background:${barColor}"></div></div><span>${Math.round(d.score_zone*100)}%</span></div>
+            <div class="score-bar"><span>Voisinage</span><div class="bar"><div style="width:${d.score_voisinage*100}%;background:${barColor}"></div></div><span>${Math.round(d.score_voisinage*100)}%</span></div>
+            <div class="score-bar"><span>Taille</span><div class="bar"><div style="width:${d.score_taille*100}%;background:${barColor}"></div></div><span>${Math.round(d.score_taille*100)}%</span></div>
+        </div>
+        <p class="det-explain">${d.explication}</p>
+    </div>`;
 }
 </script>
 {% endblock %}

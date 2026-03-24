@@ -95,6 +95,55 @@ UNET_BATCH_SIZE = 4
 UNET_WEIGHT_DECAY = 1e-4
 IGNORE_INDEX = 255
 
+# ── Segmentation hiérarchique ────────────────────────────────────────
+# Niveau 1 : 3 zones de scène (les IDs correspondent aux SEGMENTATION_CLASSES)
+ZONE_CLASSES = {
+    "mer":   {"seg_id": 1, "color": "#0077FF", "label": "Mer / Eau"},
+    "terre": {"seg_id": 2, "color": "#8B5A2B", "label": "Terre / Sol"},
+    "ciel":  {"seg_id": 3, "color": "#87CEEB", "label": "Ciel"},
+}
+
+# Niveau 2 : objets autorisés par zone (seg_id → liste de noms de classes objets)
+OBJETS_PAR_ZONE = {
+    "mer":   ["bateau_moteur", "voilier", "paddle", "kayak", "gonflable", "autre_objet"],
+    "terre": ["autre_objet"],
+    "ciel":  ["autre_objet"],
+}
+
+# Compatibilité sémantique entre objets voisins (paires autorisées)
+VOISINS_COMPATIBLES = {
+    "bateau_moteur": {"bateau_moteur", "voilier", "paddle", "kayak", "gonflable", "autre_objet"},
+    "voilier":       {"bateau_moteur", "voilier", "paddle", "kayak", "gonflable", "autre_objet"},
+    "paddle":        {"bateau_moteur", "voilier", "paddle", "kayak", "gonflable", "autre_objet"},
+    "kayak":         {"bateau_moteur", "voilier", "paddle", "kayak", "gonflable", "autre_objet"},
+    "gonflable":     {"bateau_moteur", "voilier", "paddle", "kayak", "gonflable", "autre_objet"},
+    "autre_objet":   {"bateau_moteur", "voilier", "paddle", "kayak", "gonflable", "autre_objet"},
+}
+
+# Taille relative attendue des objets (fraction de la zone parente)
+TAILLE_ATTENDUE = {
+    "bateau_moteur": (0.005, 0.40),
+    "voilier":       (0.005, 0.50),
+    "paddle":        (0.002, 0.15),
+    "kayak":         (0.002, 0.15),
+    "gonflable":     (0.002, 0.20),
+    "autre_objet":   (0.001, 0.60),
+}
+
+# Poids pour le score de confiance final
+POIDS_SCORE = {
+    "modele":       0.35,
+    "zone":         0.30,
+    "voisinage":    0.20,
+    "taille":       0.15,
+}
+
+# Seuil minimum de confiance pour garder une détection
+SEUIL_CONFIANCE = 0.25
+
+# Rayon de voisinage spatial (en pixels sur le masque redimensionné)
+VOISINAGE_RAYON = 15
+
 # ── Flask ────────────────────────────────────────────────────────────
 FLASK_PORT = 5000
 FLASK_DEBUG = True

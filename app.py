@@ -506,77 +506,32 @@ def prediction_page():
     images = list_images()
     model_path = os.path.join(config.MODELS_SAVE_DIR, "unet.pth")
     model_ready = os.path.isfile(model_path)
+    from models.hierarchical import get_annotated_classes
+    annotated = get_annotated_classes()
+    zone_names = {"eau", "terre", "ciel", "fond"}
+    annotated_objects = sorted(annotated - zone_names)
     return render_template("prediction.html",
                            images=images,
                            classes=config.SEGMENTATION_CLASSES,
-                           model_ready=model_ready)
+                           zones=config.ZONE_CLASSES,
+                           model_ready=model_ready,
+                           annotated_objects=annotated_objects)
 
 
 @app.route("/api/predict-segmentation", methods=["POST"])
 def api_predict_segmentation():
-    """Segmente automatiquement une image avec le U-Net entraîné."""
-    import base64
-    from models.unet import UNet, predict_image, mask_to_colored
-    import torchvision.transforms.functional as TF
-    import torch
-
-    model_path = os.path.join(config.MODELS_SAVE_DIR, "unet.pth")
-    if not os.path.isfile(model_path):
-        return jsonify({"error": "Modèle non entraîné."}), 400
-
+    """Segmentation hiérarchique : zones → objets par zone → voisinage → scores."""
     filename = request.json.get("filename")
     path = os.path.join(config.IMAGES_DIR, filename)
     if not os.path.isfile(path):
         return jsonify({"error": "Image non trouvée"}), 404
 
     try:
-        model = UNet.load(model_path)
-
-        pil_img = Image.open(path).convert("RGB")
-        orig_w, orig_h = pil_img.size
-        resized = pil_img.resize((config.SEG_IMAGE_SIZE, config.SEG_IMAGE_SIZE), Image.LANCZOS)
-        tensor = TF.to_tensor(resized)
-        tensor = TF.normalize(tensor, mean=[0.485, 0.456, 0.406],
-                              std=[0.229, 0.224, 0.225])
-
-        mask = predict_image(model, tensor)
-        colored_mask = mask_to_colored(mask)
-
-        # Créer l'overlay (image + masque semi-transparent)
-        mask_pil = Image.fromarray(colored_mask).resize((orig_w, orig_h), Image.NEAREST)
-        orig_arr = np.array(pil_img).astype(np.float32)
-        mask_arr = np.array(mask_pil).astype(np.float32)
-        overlay_arr = (orig_arr * 0.5 + mask_arr * 0.5).clip(0, 255).astype(np.uint8)
-
-        def to_b64(arr):
-            buf = io.BytesIO()
-            Image.fromarray(arr).save(buf, format="PNG")
-            return base64.b64encode(buf.getvalue()).decode("utf-8")
-
-        # Proportions de chaque classe
-        total_pixels = mask.shape[0] * mask.shape[1]
-        class_pcts = {}
-        for cls_info in config.SEGMENTATION_CLASSES:
-            count = int((mask == cls_info["id"]).sum())
-            pct = count / total_pixels * 100
-            class_pcts[cls_info["name"]] = round(pct, 1)
-
-        # Redimensionner original pour affichage cohérent
-        display_size = 400
-        scale = min(display_size / orig_w, display_size / orig_h, 1)
-        dw, dh = int(orig_w * scale), int(orig_h * scale)
-        orig_display = np.array(pil_img.resize((dw, dh), Image.LANCZOS))
-        mask_display = np.array(mask_pil.resize((dw, dh), Image.NEAREST))
-        overlay_display = (orig_display.astype(np.float32) * 0.5 +
-                          mask_display.astype(np.float32) * 0.5).clip(0, 255).astype(np.uint8)
-
-        return jsonify({
-            "success": True,
-            "original_b64": to_b64(orig_display),
-            "mask_b64": to_b64(mask_display),
-            "overlay_b64": to_b64(overlay_display),
-            "class_percentages": class_pcts,
-        })
+        from models.hierarchical import predict_hierarchical
+        result = predict_hierarchical(path)
+        return jsonify({"success": True, **result})
+    except FileNotFoundError as e:
+        return jsonify({"error": str(e)}), 400
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -590,6 +545,7 @@ def documentation_page():
     doc_files = {
         "utilisation": os.path.join(config.BASE_DIR, "reports", "doc_utilisation.md"),
         "verrous": os.path.join(config.BASE_DIR, "reports", "doc_verrous.md"),
+        "hierarchique": os.path.join(config.BASE_DIR, "reports", "doc_hierarchique.md"),
     }
     for key, path in doc_files.items():
         if os.path.isfile(path):

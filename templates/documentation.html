@@ -10,11 +10,16 @@
 <div class="card">
     <div class="tab-bar">
         <button class="tab active" onclick="showTab('utilisation', this)">📋 Utilisation</button>
+        <button class="tab" onclick="showTab('hierarchique', this)">🔬 Hiérarchique & Voisinage</button>
         <button class="tab" onclick="showTab('verrous', this)">⚠️ Verrous & Corrections</button>
     </div>
 
     <div id="tab-utilisation" class="tab-content active">
         {{ docs.utilisation|safe }}
+    </div>
+
+    <div id="tab-hierarchique" class="tab-content" style="display:none;">
+        {{ docs.hierarchique|safe }}
     </div>
 
     <div id="tab-verrous" class="tab-content" style="display:none;">
