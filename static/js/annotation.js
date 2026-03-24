@@ -36,10 +36,10 @@ function loadAnnotationImage() {
         imgOrigW = img.naturalWidth;
         imgOrigH = img.naturalHeight;
 
-        const wrapper = document.getElementById('canvas-wrapper');
-        const maxW = wrapper.clientWidth - 4;
-        // L'image prend toute la largeur disponible, sans plafond de zoom
-        const scale = maxW / imgOrigW;
+        // Mesurer l'espace dispo dans la card parente (pas le wrapper inline-block)
+        const card = document.querySelector('.annotation-canvas-area');
+        const availW = card.clientWidth - 30;
+        const scale = availW / imgOrigW;
         cW = Math.round(imgOrigW * scale);
         cH = Math.round(imgOrigH * scale);
         scaleX = imgOrigW / cW;
