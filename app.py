@@ -409,49 +409,64 @@ def annotation_page():
                            n_total=len(images))
 
 
-@app.route("/api/save-mask", methods=["POST"])
-def api_save_mask():
-    """Sauvegarde le masque d'annotation (niveaux de gris, pixel = indice de classe)."""
-    import base64
+@app.route("/api/save-annotation", methods=["POST"])
+def api_save_annotation():
+    """Sauvegarde les polygones d'annotation + génère le masque PNG pour l'entraînement."""
     data = request.json
     filename = data.get("filename")
-    mask_b64 = data.get("mask_b64")
-    color_b64 = data.get("color_b64")
+    poly_data = data.get("polygons", [])
+    img_w = data.get("image_width", 0)
+    img_h = data.get("image_height", 0)
 
-    if not filename or not mask_b64:
-        return jsonify({"error": "filename et mask_b64 requis"}), 400
+    if not filename or not poly_data:
+        return jsonify({"error": "filename et polygons requis"}), 400
 
     try:
-        mask_bytes = base64.b64decode(mask_b64)
+        # 1. Sauvegarder les polygones en JSON (éditable)
+        ann_name = os.path.splitext(filename)[0] + ".json"
+        ann_path = os.path.join(config.ANNOTATIONS_DIR, ann_name)
+        with open(ann_path, "w", encoding="utf-8") as f:
+            json.dump({
+                "filename": filename,
+                "image_width": img_w,
+                "image_height": img_h,
+                "polygons": poly_data,
+            }, f, indent=2, ensure_ascii=False)
+
+        # 2. Rasteriser les polygones en masque PNG (pixel = indice de classe)
+        import cv2
+        mask = np.full((img_h, img_w), config.IGNORE_INDEX, dtype=np.uint8)
+        for poly in poly_data:
+            pts = np.array(poly["points"], dtype=np.int32)
+            cv2.fillPoly(mask, [pts], int(poly["class_id"]))
+
         mask_name = os.path.splitext(filename)[0] + ".png"
         mask_path = os.path.join(config.MASKS_DIR, mask_name)
-        with open(mask_path, "wb") as f:
-            f.write(mask_bytes)
+        from PIL import Image as PILImage
+        PILImage.fromarray(mask).save(mask_path)
 
-        if color_b64:
-            color_bytes = base64.b64decode(color_b64)
-            color_path = os.path.join(config.MASKS_DIR, os.path.splitext(filename)[0] + "_color.png")
-            with open(color_path, "wb") as f:
-                f.write(color_bytes)
-
-        return jsonify({"success": True, "mask_path": mask_path})
+        return jsonify({
+            "success": True,
+            "n_polygons": len(poly_data),
+            "annotation_path": ann_path,
+            "mask_path": mask_path,
+        })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 
-@app.route("/api/load-mask/<filename>")
-def api_load_mask(filename):
-    """Charge le masque coloré existant pour affichage dans le canvas."""
-    import base64
-    color_name = os.path.splitext(filename)[0] + "_color.png"
-    color_path = os.path.join(config.MASKS_DIR, color_name)
+@app.route("/api/load-annotation/<filename>")
+def api_load_annotation(filename):
+    """Charge les polygones existants pour une image."""
+    ann_name = os.path.splitext(filename)[0] + ".json"
+    ann_path = os.path.join(config.ANNOTATIONS_DIR, ann_name)
 
-    if not os.path.isfile(color_path):
-        return jsonify({"error": "Pas de masque existant"}), 404
+    if not os.path.isfile(ann_path):
+        return jsonify({"error": "Pas d'annotation existante"}), 404
 
-    with open(color_path, "rb") as f:
-        b64 = base64.b64encode(f.read()).decode("utf-8")
-    return jsonify({"mask_b64": b64, "filename": filename})
+    with open(ann_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    return jsonify(data)
 
 
 @app.route("/api/train-segmentation", methods=["POST"])

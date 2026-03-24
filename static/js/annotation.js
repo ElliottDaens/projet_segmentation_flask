@@ -1,70 +1,86 @@
 /* ═══════════════════════════════════════════════════════════════════
-   Outil d'annotation par zones — Canvas de dessin
-   L'utilisateur peint les zones (eau, terre, bateau…) sur l'image.
-   Le masque est sauvegardé en niveaux de gris (pixel = indice de classe).
+   Outil d'annotation par POLYGONES
+   L'utilisateur trace des polygones pour délimiter les zones
+   (eau, terre, ciel, bateau moteur, voilier…) sur chaque image.
    ═══════════════════════════════════════════════════════════════════ */
 
 const canvasImage = document.getElementById('canvas-image');
 const canvasOverlay = document.getElementById('canvas-overlay');
-const canvasCursor = document.getElementById('canvas-cursor');
+const canvasInteract = document.getElementById('canvas-interact');
 const ctxImage = canvasImage.getContext('2d');
 const ctxOverlay = canvasOverlay.getContext('2d');
-const ctxCursor = canvasCursor.getContext('2d');
+const ctxInteract = canvasInteract.getContext('2d');
 
-let currentClassId = 0;
-let currentColor = '#000000';
-let brushSize = 20;
-let isDrawing = false;
-let undoStack = [];
-let imgOriginalWidth = 0;
-let imgOriginalHeight = 0;
-let canvasDisplayWidth = 0;
-let canvasDisplayHeight = 0;
+let currentClassId = 1;
+let currentColor = '#0077FF';
+let currentClassName = 'eau';
 
-// ── Initialisation ──────────────────────────────────────────────────
+let polygons = [];            // [{classId, className, color, points:[[x,y],...]}]
+let currentPoints = [];       // points du polygone en cours de dessin
+let selectedPolyIndex = -1;   // polygone sélectionné (-1 = aucun)
+
+let imgOrigW = 0, imgOrigH = 0;
+let cW = 0, cH = 0;          // taille affichée du canvas
+let scaleX = 1, scaleY = 1;  // ratio affichage → original
+
+const CLOSE_RADIUS = 12;     // px pour fermer le polygone en cliquant le 1er point
+const VERTEX_RADIUS = 5;
+
+// ── Chargement image ────────────────────────────────────────────────
 
 function loadAnnotationImage() {
     const filename = document.getElementById('annotation-image').value;
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.onload = function () {
-        imgOriginalWidth = img.naturalWidth;
-        imgOriginalHeight = img.naturalHeight;
+        imgOrigW = img.naturalWidth;
+        imgOrigH = img.naturalHeight;
 
-        const maxW = document.getElementById('canvas-wrapper').clientWidth - 20;
-        const scale = Math.min(maxW / img.naturalWidth, 700 / img.naturalHeight, 1);
-        canvasDisplayWidth = Math.round(img.naturalWidth * scale);
-        canvasDisplayHeight = Math.round(img.naturalHeight * scale);
+        const wrapper = document.getElementById('canvas-wrapper');
+        const maxW = wrapper.clientWidth - 4;
+        const maxH = window.innerHeight - 160;
+        const scale = Math.min(maxW / imgOrigW, maxH / imgOrigH, 1.5);
+        cW = Math.round(imgOrigW * scale);
+        cH = Math.round(imgOrigH * scale);
+        scaleX = imgOrigW / cW;
+        scaleY = imgOrigH / cH;
 
-        [canvasImage, canvasOverlay, canvasCursor].forEach(c => {
-            c.width = canvasDisplayWidth;
-            c.height = canvasDisplayHeight;
+        [canvasImage, canvasOverlay, canvasInteract].forEach(c => {
+            c.width = cW;
+            c.height = cH;
+            c.style.width = cW + 'px';
+            c.style.height = cH + 'px';
         });
 
-        ctxImage.drawImage(img, 0, 0, canvasDisplayWidth, canvasDisplayHeight);
-        ctxOverlay.clearRect(0, 0, canvasDisplayWidth, canvasDisplayHeight);
-        undoStack = [];
+        ctxImage.drawImage(img, 0, 0, cW, cH);
+        polygons = [];
+        currentPoints = [];
+        selectedPolyIndex = -1;
 
         document.getElementById('canvas-hint').textContent =
-            `${imgOriginalWidth}×${imgOriginalHeight}px — Peignez les zones avec le pinceau`;
+            `${imgOrigW}×${imgOrigH}px — Cliquez pour tracer des polygones`;
 
-        // Charger le masque existant s'il y en a un
-        loadExistingMask(filename);
+        loadExistingAnnotation(filename);
+        redraw();
+        updatePolygonList();
     };
     img.src = '/api/image/' + filename;
 }
 
-function loadExistingMask(filename) {
-    fetch('/api/load-mask/' + filename)
-        .then(r => { if (!r.ok) throw new Error('pas de masque'); return r.json(); })
+function loadExistingAnnotation(filename) {
+    fetch('/api/load-annotation/' + filename)
+        .then(r => { if (!r.ok) throw new Error('none'); return r.json(); })
         .then(data => {
-            if (data.mask_b64) {
-                const maskImg = new Image();
-                maskImg.onload = function () {
-                    ctxOverlay.drawImage(maskImg, 0, 0, canvasDisplayWidth, canvasDisplayHeight);
-                    saveUndoState();
-                };
-                maskImg.src = 'data:image/png;base64,' + data.mask_b64;
+            if (data.polygons && data.polygons.length > 0) {
+                polygons = data.polygons.map(p => ({
+                    classId: p.class_id,
+                    className: p.class_name,
+                    color: p.color,
+                    points: p.points.map(pt => [pt[0] / scaleX, pt[1] / scaleY]),
+                }));
+                redraw();
+                updatePolygonList();
+                showToast(polygons.length + ' polygone(s) chargé(s)');
             }
         })
         .catch(() => {});
@@ -72,20 +88,275 @@ function loadExistingMask(filename) {
 
 // ── Sélection de classe ─────────────────────────────────────────────
 
-function selectClass(id, color) {
+function selectClass(id, color, name) {
     currentClassId = id;
     currentColor = color;
+    currentClassName = name;
     document.querySelectorAll('.btn-class').forEach(b => {
         b.classList.toggle('active', parseInt(b.dataset.id) === id);
     });
+    document.getElementById('current-class-display').textContent = name.replace(/_/g, ' ');
+    document.getElementById('current-class-display').style.color = color;
 }
 
-// ── Pinceau ─────────────────────────────────────────────────────────
+// ── Dessin ──────────────────────────────────────────────────────────
 
-function updateBrushSize() {
-    brushSize = parseInt(document.getElementById('brush-size').value);
-    document.getElementById('brush-size-label').textContent = brushSize;
+function getPos(e) {
+    const rect = canvasInteract.getBoundingClientRect();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    return { x: clientX - rect.left, y: clientY - rect.top };
 }
+
+canvasInteract.addEventListener('click', function (e) {
+    const pos = getPos(e);
+
+    // Si on clique près du 1er point et qu'on a au moins 3 points → fermer
+    if (currentPoints.length >= 3) {
+        const first = currentPoints[0];
+        const dist = Math.hypot(pos.x - first[0], pos.y - first[1]);
+        if (dist < CLOSE_RADIUS) {
+            closePolygon();
+            return;
+        }
+    }
+
+    currentPoints.push([pos.x, pos.y]);
+    selectedPolyIndex = -1;
+    redrawInteraction();
+});
+
+canvasInteract.addEventListener('dblclick', function (e) {
+    e.preventDefault();
+    if (currentPoints.length >= 3) {
+        closePolygon();
+    }
+});
+
+canvasInteract.addEventListener('contextmenu', function (e) {
+    e.preventDefault();
+    if (currentPoints.length > 0) {
+        currentPoints = [];
+        redrawInteraction();
+        showToast('Polygone annulé');
+    }
+});
+
+canvasInteract.addEventListener('mousemove', function (e) {
+    const pos = getPos(e);
+    redrawInteraction(pos);
+});
+
+// Touch support
+canvasInteract.addEventListener('touchstart', function (e) {
+    e.preventDefault();
+    const pos = getPos(e);
+    if (currentPoints.length >= 3) {
+        const first = currentPoints[0];
+        if (Math.hypot(pos.x - first[0], pos.y - first[1]) < CLOSE_RADIUS * 1.5) {
+            closePolygon();
+            return;
+        }
+    }
+    currentPoints.push([pos.x, pos.y]);
+    redrawInteraction();
+}, { passive: false });
+
+// ── Fermer un polygone ──────────────────────────────────────────────
+
+function closePolygon() {
+    polygons.push({
+        classId: currentClassId,
+        className: currentClassName,
+        color: currentColor,
+        points: [...currentPoints],
+    });
+    currentPoints = [];
+    redraw();
+    updatePolygonList();
+}
+
+// ── Rendu ───────────────────────────────────────────────────────────
+
+function redraw() {
+    ctxOverlay.clearRect(0, 0, cW, cH);
+
+    polygons.forEach((poly, idx) => {
+        if (poly.points.length < 3) return;
+
+        // Remplissage semi-transparent
+        ctxOverlay.beginPath();
+        ctxOverlay.moveTo(poly.points[0][0], poly.points[0][1]);
+        for (let i = 1; i < poly.points.length; i++) {
+            ctxOverlay.lineTo(poly.points[i][0], poly.points[i][1]);
+        }
+        ctxOverlay.closePath();
+        ctxOverlay.fillStyle = hexToRgba(poly.color, 0.35);
+        ctxOverlay.fill();
+
+        // Contour
+        ctxOverlay.strokeStyle = poly.color;
+        ctxOverlay.lineWidth = idx === selectedPolyIndex ? 3 : 2;
+        ctxOverlay.stroke();
+
+        // Sommets
+        poly.points.forEach(pt => {
+            ctxOverlay.beginPath();
+            ctxOverlay.arc(pt[0], pt[1], VERTEX_RADIUS, 0, Math.PI * 2);
+            ctxOverlay.fillStyle = poly.color;
+            ctxOverlay.fill();
+            ctxOverlay.strokeStyle = '#fff';
+            ctxOverlay.lineWidth = 1;
+            ctxOverlay.stroke();
+        });
+
+        // Label au centre
+        const cx = poly.points.reduce((s, p) => s + p[0], 0) / poly.points.length;
+        const cy = poly.points.reduce((s, p) => s + p[1], 0) / poly.points.length;
+        ctxOverlay.font = 'bold 13px sans-serif';
+        ctxOverlay.textAlign = 'center';
+        ctxOverlay.fillStyle = '#fff';
+        ctxOverlay.strokeStyle = '#000';
+        ctxOverlay.lineWidth = 3;
+        const label = poly.className.replace(/_/g, ' ');
+        ctxOverlay.strokeText(label, cx, cy);
+        ctxOverlay.fillText(label, cx, cy);
+    });
+
+    redrawInteraction();
+}
+
+function redrawInteraction(mousePos) {
+    ctxInteract.clearRect(0, 0, cW, cH);
+
+    if (currentPoints.length === 0) {
+        if (mousePos) drawCrosshair(mousePos);
+        return;
+    }
+
+    // Lignes du polygone en cours
+    ctxInteract.beginPath();
+    ctxInteract.moveTo(currentPoints[0][0], currentPoints[0][1]);
+    for (let i = 1; i < currentPoints.length; i++) {
+        ctxInteract.lineTo(currentPoints[i][0], currentPoints[i][1]);
+    }
+    if (mousePos) {
+        ctxInteract.lineTo(mousePos.x, mousePos.y);
+    }
+    ctxInteract.strokeStyle = currentColor;
+    ctxInteract.lineWidth = 2;
+    ctxInteract.setLineDash([6, 4]);
+    ctxInteract.stroke();
+    ctxInteract.setLineDash([]);
+
+    // Points
+    currentPoints.forEach((pt, i) => {
+        ctxInteract.beginPath();
+        const r = (i === 0 && currentPoints.length >= 3) ? CLOSE_RADIUS : VERTEX_RADIUS;
+        ctxInteract.arc(pt[0], pt[1], r, 0, Math.PI * 2);
+        ctxInteract.fillStyle = (i === 0) ? '#ffffff' : currentColor;
+        ctxInteract.fill();
+        ctxInteract.strokeStyle = currentColor;
+        ctxInteract.lineWidth = 2;
+        ctxInteract.stroke();
+    });
+
+    // Indication de fermeture
+    if (currentPoints.length >= 3 && mousePos) {
+        const first = currentPoints[0];
+        const dist = Math.hypot(mousePos.x - first[0], mousePos.y - first[1]);
+        if (dist < CLOSE_RADIUS * 2) {
+            ctxInteract.beginPath();
+            ctxInteract.arc(first[0], first[1], CLOSE_RADIUS + 4, 0, Math.PI * 2);
+            ctxInteract.strokeStyle = '#fff';
+            ctxInteract.lineWidth = 2;
+            ctxInteract.stroke();
+        }
+    }
+
+    if (mousePos) drawCrosshair(mousePos);
+}
+
+function drawCrosshair(pos) {
+    ctxInteract.strokeStyle = 'rgba(255,255,255,0.4)';
+    ctxInteract.lineWidth = 1;
+    ctxInteract.setLineDash([3, 3]);
+    ctxInteract.beginPath();
+    ctxInteract.moveTo(pos.x, 0); ctxInteract.lineTo(pos.x, cH);
+    ctxInteract.moveTo(0, pos.y); ctxInteract.lineTo(cW, pos.y);
+    ctxInteract.stroke();
+    ctxInteract.setLineDash([]);
+}
+
+function hexToRgba(hex, alpha) {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return `rgba(${r},${g},${b},${alpha})`;
+}
+
+// ── Liste des polygones ─────────────────────────────────────────────
+
+function updatePolygonList() {
+    const list = document.getElementById('polygon-list');
+    if (!list) return;
+    if (polygons.length === 0) {
+        list.innerHTML = '<p class="hint">Aucun polygone. Cliquez sur l\'image pour commencer.</p>';
+        return;
+    }
+    list.innerHTML = polygons.map((p, i) =>
+        `<div class="poly-item ${i === selectedPolyIndex ? 'selected' : ''}" onclick="selectPolygon(${i})">
+            <span class="cls-dot" style="background:${p.color}"></span>
+            <span>${p.className.replace(/_/g,' ')}</span>
+            <span class="poly-pts">${p.points.length} pts</span>
+            <button class="btn-icon" onclick="event.stopPropagation();deletePolygon(${i})" title="Supprimer">✕</button>
+        </div>`
+    ).join('');
+
+    document.getElementById('polygon-count').textContent = polygons.length;
+}
+
+function selectPolygon(idx) {
+    selectedPolyIndex = (selectedPolyIndex === idx) ? -1 : idx;
+    redraw();
+    updatePolygonList();
+}
+
+function deletePolygon(idx) {
+    polygons.splice(idx, 1);
+    selectedPolyIndex = -1;
+    redraw();
+    updatePolygonList();
+}
+
+function deleteSelected() {
+    if (selectedPolyIndex >= 0) {
+        deletePolygon(selectedPolyIndex);
+    }
+}
+
+function clearAll() {
+    if (polygons.length === 0 && currentPoints.length === 0) return;
+    if (!confirm('Supprimer tous les polygones ?')) return;
+    polygons = [];
+    currentPoints = [];
+    selectedPolyIndex = -1;
+    redraw();
+    updatePolygonList();
+}
+
+function undoLastPoint() {
+    if (currentPoints.length > 0) {
+        currentPoints.pop();
+        redrawInteraction();
+    } else if (polygons.length > 0) {
+        polygons.pop();
+        redraw();
+        updatePolygonList();
+    }
+}
+
+// ── Opacité ─────────────────────────────────────────────────────────
 
 function updateOpacity() {
     const val = parseInt(document.getElementById('overlay-opacity').value);
@@ -93,208 +364,46 @@ function updateOpacity() {
     canvasOverlay.style.opacity = val / 100;
 }
 
-// ── Dessin ──────────────────────────────────────────────────────────
+// ── Sauvegarde ──────────────────────────────────────────────────────
 
-function getPos(e) {
-    const rect = canvasOverlay.getBoundingClientRect();
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-    return {
-        x: clientX - rect.left,
-        y: clientY - rect.top
-    };
-}
-
-function drawDot(x, y) {
-    ctxOverlay.beginPath();
-    ctxOverlay.arc(x, y, brushSize / 2, 0, Math.PI * 2);
-    ctxOverlay.fillStyle = currentColor;
-    ctxOverlay.fill();
-}
-
-function drawLine(x1, y1, x2, y2) {
-    ctxOverlay.lineWidth = brushSize;
-    ctxOverlay.lineCap = 'round';
-    ctxOverlay.strokeStyle = currentColor;
-    ctxOverlay.beginPath();
-    ctxOverlay.moveTo(x1, y1);
-    ctxOverlay.lineTo(x2, y2);
-    ctxOverlay.stroke();
-}
-
-let lastX = 0, lastY = 0;
-
-canvasOverlay.addEventListener('mousedown', e => {
-    isDrawing = true;
-    saveUndoState();
-    const pos = getPos(e);
-    lastX = pos.x;
-    lastY = pos.y;
-    drawDot(pos.x, pos.y);
-});
-
-canvasOverlay.addEventListener('mousemove', e => {
-    const pos = getPos(e);
-    drawCursorPreview(pos.x, pos.y);
-    if (!isDrawing) return;
-    drawLine(lastX, lastY, pos.x, pos.y);
-    lastX = pos.x;
-    lastY = pos.y;
-});
-
-canvasOverlay.addEventListener('mouseup', () => { isDrawing = false; });
-canvasOverlay.addEventListener('mouseleave', () => { isDrawing = false; clearCursorPreview(); });
-
-// Touch support
-canvasOverlay.addEventListener('touchstart', e => {
-    e.preventDefault();
-    isDrawing = true;
-    saveUndoState();
-    const pos = getPos(e);
-    lastX = pos.x;
-    lastY = pos.y;
-    drawDot(pos.x, pos.y);
-}, { passive: false });
-
-canvasOverlay.addEventListener('touchmove', e => {
-    e.preventDefault();
-    if (!isDrawing) return;
-    const pos = getPos(e);
-    drawLine(lastX, lastY, pos.x, pos.y);
-    lastX = pos.x;
-    lastY = pos.y;
-}, { passive: false });
-
-canvasOverlay.addEventListener('touchend', () => { isDrawing = false; });
-
-// ── Curseur ─────────────────────────────────────────────────────────
-
-function drawCursorPreview(x, y) {
-    ctxCursor.clearRect(0, 0, canvasCursor.width, canvasCursor.height);
-    ctxCursor.beginPath();
-    ctxCursor.arc(x, y, brushSize / 2, 0, Math.PI * 2);
-    ctxCursor.strokeStyle = 'white';
-    ctxCursor.lineWidth = 2;
-    ctxCursor.stroke();
-    ctxCursor.beginPath();
-    ctxCursor.arc(x, y, brushSize / 2, 0, Math.PI * 2);
-    ctxCursor.strokeStyle = 'black';
-    ctxCursor.lineWidth = 1;
-    ctxCursor.stroke();
-}
-
-function clearCursorPreview() {
-    ctxCursor.clearRect(0, 0, canvasCursor.width, canvasCursor.height);
-}
-
-// ── Undo ────────────────────────────────────────────────────────────
-
-function saveUndoState() {
-    if (undoStack.length > 30) undoStack.shift();
-    undoStack.push(ctxOverlay.getImageData(0, 0, canvasDisplayWidth, canvasDisplayHeight));
-}
-
-function undoStroke() {
-    if (undoStack.length === 0) return;
-    const state = undoStack.pop();
-    ctxOverlay.putImageData(state, 0, 0);
-}
-
-function clearCanvas() {
-    saveUndoState();
-    ctxOverlay.clearRect(0, 0, canvasDisplayWidth, canvasDisplayHeight);
-}
-
-// ── Sauvegarde du masque ────────────────────────────────────────────
-
-function saveMask() {
+function saveAnnotation() {
     const filename = document.getElementById('annotation-image').value;
 
-    // Créer un canvas temporaire à la taille originale de l'image
-    const tmpCanvas = document.createElement('canvas');
-    tmpCanvas.width = imgOriginalWidth;
-    tmpCanvas.height = imgOriginalHeight;
-    const tmpCtx = tmpCanvas.getContext('2d');
+    // Convertir les points en coordonnées originales
+    const polyData = polygons.map(p => ({
+        class_id: p.classId,
+        class_name: p.className,
+        color: p.color,
+        points: p.points.map(pt => [
+            Math.round(pt[0] * scaleX),
+            Math.round(pt[1] * scaleY),
+        ]),
+    }));
 
-    // Redessiner l'overlay à la taille originale
-    tmpCtx.drawImage(canvasOverlay, 0, 0, imgOriginalWidth, imgOriginalHeight);
-    const imgData = tmpCtx.getImageData(0, 0, imgOriginalWidth, imgOriginalHeight);
-    const pixels = imgData.data;
-
-    // Créer le masque : chaque pixel RGB → indice de classe le plus proche
-    const maskCanvas = document.createElement('canvas');
-    maskCanvas.width = imgOriginalWidth;
-    maskCanvas.height = imgOriginalHeight;
-    const maskCtx = maskCanvas.getContext('2d');
-    const maskData = maskCtx.createImageData(imgOriginalWidth, imgOriginalHeight);
-
-    for (let i = 0; i < pixels.length; i += 4) {
-        const r = pixels[i], g = pixels[i + 1], b = pixels[i + 2], a = pixels[i + 3];
-        let classId = 255; // non annoté
-
-        if (a > 30) {
-            classId = findClosestClass(r, g, b);
-        }
-
-        // Stocker en niveaux de gris (R=G=B=classId)
-        maskData.data[i] = classId;
-        maskData.data[i + 1] = classId;
-        maskData.data[i + 2] = classId;
-        maskData.data[i + 3] = 255;
-    }
-
-    maskCtx.putImageData(maskData, 0, 0);
-
-    // Aussi créer un overlay coloré pour visualisation
-    const colorCanvas = document.createElement('canvas');
-    colorCanvas.width = imgOriginalWidth;
-    colorCanvas.height = imgOriginalHeight;
-    const colorCtx = colorCanvas.getContext('2d');
-    colorCtx.drawImage(canvasOverlay, 0, 0, imgOriginalWidth, imgOriginalHeight);
-
-    const maskB64 = maskCanvas.toDataURL('image/png').split(',')[1];
-    const colorB64 = colorCanvas.toDataURL('image/png').split(',')[1];
-
-    fetch('/api/save-mask', {
+    fetch('/api/save-annotation', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             filename: filename,
-            mask_b64: maskB64,
-            color_b64: colorB64,
+            polygons: polyData,
+            image_width: imgOrigW,
+            image_height: imgOrigH,
         })
     })
     .then(r => r.json())
     .then(data => {
         if (data.success) {
-            showToast('Masque sauvegardé pour ' + filename);
+            showToast(`Sauvegardé : ${polygons.length} polygone(s) pour ${filename}`);
         } else {
             showToast(data.error || 'Erreur', 'error');
         }
     });
 }
 
-function findClosestClass(r, g, b) {
-    let bestId = 0;
-    let bestDist = Infinity;
-    for (const cls of SEG_CLASSES) {
-        const cr = parseInt(cls.color.slice(1, 3), 16);
-        const cg = parseInt(cls.color.slice(3, 5), 16);
-        const cb = parseInt(cls.color.slice(5, 7), 16);
-        const dist = (r - cr) ** 2 + (g - cg) ** 2 + (b - cb) ** 2;
-        if (dist < bestDist) {
-            bestDist = dist;
-            bestId = cls.id;
-        }
-    }
-    return bestId;
-}
-
 // ── Entraînement ────────────────────────────────────────────────────
 
 function trainModel() {
-    showLoading('Entraînement du U-Net en cours… Cela peut prendre quelques minutes.');
-
+    showLoading('Entraînement du U-Net… Cela peut prendre quelques minutes.');
     fetch('/api/train-segmentation', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -304,7 +413,7 @@ function trainModel() {
     .then(data => {
         hideLoading();
         if (data.success) {
-            showToast('Modèle entraîné ! Loss finale : ' + data.final_loss.toFixed(4));
+            showToast('Modèle entraîné ! Loss : ' + data.final_loss.toFixed(4));
         } else {
             showToast(data.error || 'Erreur', 'error');
         }
@@ -312,9 +421,36 @@ function trainModel() {
     .catch(err => { hideLoading(); showToast('Erreur : ' + err, 'error'); });
 }
 
+// ── Raccourcis clavier ──────────────────────────────────────────────
+
+document.addEventListener('keydown', function (e) {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+    switch (e.key) {
+        case 'Enter':
+            if (currentPoints.length >= 3) closePolygon();
+            break;
+        case 'Escape':
+            currentPoints = [];
+            redrawInteraction();
+            break;
+        case 'z':
+            if (e.ctrlKey) undoLastPoint();
+            break;
+        case 'Delete':
+        case 'Backspace':
+            deleteSelected();
+            break;
+        case 's':
+            if (e.ctrlKey) { e.preventDefault(); saveAnnotation(); }
+            break;
+    }
+});
+
 // ── Init ────────────────────────────────────────────────────────────
 
 if (INITIAL_IMAGE) {
     loadAnnotationImage();
 }
-selectClass(0, SEG_CLASSES[0].color);
+if (SEG_CLASSES.length > 1) {
+    selectClass(SEG_CLASSES[1].id, SEG_CLASSES[1].color, SEG_CLASSES[1].name);
+}

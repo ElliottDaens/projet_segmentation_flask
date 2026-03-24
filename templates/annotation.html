@@ -3,8 +3,8 @@
 
 {% block content %}
 <div class="page-header">
-    <h1>Annotation par zones</h1>
-    <p class="subtitle">Dessinez sur l'image pour apprendre à l'ordinateur ce que c'est : eau, terre, bateau…</p>
+    <h1>Annotation par polygones</h1>
+    <p class="subtitle">Délimitez les zones (eau, terre, ciel, bateau…) en traçant des polygones sur l'image</p>
 </div>
 
 <div class="annotation-layout">
@@ -17,34 +17,33 @@
             {% endfor %}
         </select>
 
-        <h3 style="margin-top:1rem;">Classes</h3>
+        <h3 style="margin-top:1rem;">Zone active : <span id="current-class-display" style="color:#0077FF">eau</span></h3>
         <div class="class-buttons" id="class-buttons">
             {% for cls in classes %}
-            <button class="btn-class {{ 'active' if cls.id == 0 }}"
+            <button class="btn-class {{ 'active' if cls.id == 1 }}"
                     data-id="{{ cls.id }}" data-color="{{ cls.color }}"
                     style="--cls-color: {{ cls.color }}"
-                    onclick="selectClass({{ cls.id }}, '{{ cls.color }}')">
+                    onclick="selectClass({{ cls.id }}, '{{ cls.color }}', '{{ cls.name }}')">
                 <span class="cls-dot" style="background:{{ cls.color }}"></span>
                 {{ cls.name | replace('_', ' ') | title }}
             </button>
             {% endfor %}
         </div>
 
-        <h3 style="margin-top:1rem;">Pinceau</h3>
-        <div class="form-group">
-            <label>Taille : <span id="brush-size-label">20</span>px</label>
-            <input type="range" id="brush-size" min="2" max="80" value="20" oninput="updateBrushSize()">
+        <h3 style="margin-top:1rem;">Polygones (<span id="polygon-count">0</span>)</h3>
+        <div id="polygon-list" class="polygon-list">
+            <p class="hint">Aucun polygone. Cliquez sur l'image pour commencer.</p>
         </div>
-        <div class="form-group">
-            <label>Opacité overlay : <span id="opacity-label">60</span>%</label>
-            <input type="range" id="overlay-opacity" min="10" max="100" value="60" oninput="updateOpacity()">
-        </div>
+
+        <h3 style="margin-top:1rem;">Opacité : <span id="opacity-label">55</span>%</h3>
+        <input type="range" id="overlay-opacity" min="10" max="100" value="55" oninput="updateOpacity()" style="width:100%">
 
         <h3 style="margin-top:1rem;">Actions</h3>
         <div class="toolbar-actions">
-            <button class="btn btn-secondary" onclick="undoStroke()">↩ Annuler</button>
-            <button class="btn btn-secondary" onclick="clearCanvas()">🗑 Effacer tout</button>
-            <button class="btn btn-primary" onclick="saveMask()">💾 Sauvegarder</button>
+            <button class="btn btn-secondary" onclick="undoLastPoint()">↩ Annuler (Ctrl+Z)</button>
+            <button class="btn btn-secondary" onclick="deleteSelected()">🗑 Suppr. sélectionné</button>
+            <button class="btn btn-secondary" onclick="clearAll()">✕ Tout effacer</button>
+            <button class="btn btn-primary" onclick="saveAnnotation()">💾 Sauvegarder (Ctrl+S)</button>
         </div>
 
         <div class="annotation-stats" style="margin-top:1rem;">
@@ -57,19 +56,31 @@
                 🧠 Entraîner le modèle ({{ n_annotated }} masques)
             </button>
             {% else %}
-            <p class="hint">Annotez au moins 3 images pour entraîner le modèle.</p>
+            <p class="hint">Annotez au moins 3 images pour entraîner.</p>
             {% endif %}
+        </div>
+
+        <div class="help-box" style="margin-top:1rem;">
+            <h4>Aide</h4>
+            <ul>
+                <li><strong>Clic</strong> : ajouter un point</li>
+                <li><strong>Clic sur le 1er point</strong> ou <strong>Entrée</strong> : fermer le polygone</li>
+                <li><strong>Double-clic</strong> : fermer le polygone</li>
+                <li><strong>Clic droit</strong> ou <strong>Échap</strong> : annuler le polygone en cours</li>
+                <li><strong>Ctrl+Z</strong> : annuler le dernier point/polygone</li>
+                <li><strong>Suppr</strong> : supprimer le polygone sélectionné</li>
+            </ul>
         </div>
     </div>
 
-    <!-- Zone de dessin -->
-    <div class="card annotation-canvas-container">
+    <!-- Zone de dessin (grande) -->
+    <div class="card annotation-canvas-area">
         <div class="canvas-wrapper" id="canvas-wrapper">
             <canvas id="canvas-image"></canvas>
             <canvas id="canvas-overlay"></canvas>
-            <canvas id="canvas-cursor" style="pointer-events:none;"></canvas>
+            <canvas id="canvas-interact"></canvas>
         </div>
-        <div id="canvas-hint" class="hint">Chargement de l'image…</div>
+        <div id="canvas-hint" class="hint" style="text-align:center;margin-top:0.5rem;">Chargement…</div>
     </div>
 </div>
 

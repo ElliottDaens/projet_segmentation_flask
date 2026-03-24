@@ -74,6 +74,7 @@ DEFAULT_LABELS = [
 
 # ── Segmentation sémantique (annotation par zones) ─────────────────
 MASKS_DIR = os.path.join(DATA_DIR, "masks")
+ANNOTATIONS_DIR = os.path.join(DATA_DIR, "annotations")
 SEGMENTATION_CLASSES = [
     {"id": 0, "name": "fond",           "color": "#000000"},
     {"id": 1, "name": "eau",            "color": "#0077FF"},
@@ -101,5 +102,5 @@ SECRET_KEY = "segmentation-embarcations-2025"
 UPLOAD_DIR = os.path.join(BASE_DIR, "static", "uploads")
 
 # Créer les dossiers nécessaires au démarrage
-for d in [DATA_DIR, EMBEDDINGS_DIR, MODELS_SAVE_DIR, FIGURES_DIR, UPLOAD_DIR, MASKS_DIR]:
+for d in [DATA_DIR, EMBEDDINGS_DIR, MODELS_SAVE_DIR, FIGURES_DIR, UPLOAD_DIR, MASKS_DIR, ANNOTATIONS_DIR]:
     os.makedirs(d, exist_ok=True)

@@ -586,8 +586,9 @@ input:focus, select:focus { border-color: var(--primary); }
 
 .toolbar-actions .btn { width: 100%; justify-content: center; }
 
-.annotation-canvas-container {
-    min-height: 500px;
+.annotation-canvas-area {
+    min-height: 600px;
+    padding: 1rem;
 }
 
 .canvas-wrapper {
@@ -597,19 +598,76 @@ input:focus, select:focus { border-color: var(--primary); }
     border-radius: 8px;
     overflow: hidden;
     border: 2px solid var(--border);
+    max-width: 100%;
 }
 
 .canvas-wrapper canvas {
     display: block;
+    max-width: 100%;
 }
 
-#canvas-overlay, #canvas-cursor {
+#canvas-overlay, #canvas-interact {
     position: absolute;
     top: 0;
     left: 0;
 }
 
-#canvas-overlay { opacity: 0.6; }
+#canvas-overlay { opacity: 0.55; }
+
+/* ── Polygon list ──────────────────────────────────────────────── */
+
+.polygon-list {
+    max-height: 200px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.poly-item {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.35rem 0.5rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    border: 1px solid transparent;
+    transition: all 0.15s;
+}
+
+.poly-item:hover { background: var(--bg-input); }
+.poly-item.selected { border-color: var(--primary); background: rgba(124,58,237,0.1); }
+.poly-pts { color: var(--text-secondary); font-size: 0.7rem; margin-left: auto; }
+
+.btn-icon {
+    width: 22px;
+    height: 22px;
+    border: none;
+    background: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-icon:hover { background: var(--danger); color: white; }
+
+/* ── Help box ──────────────────────────────────────────────────── */
+
+.help-box {
+    background: var(--bg-input);
+    border-radius: 8px;
+    padding: 0.75rem;
+    font-size: 0.75rem;
+}
+
+.help-box h4 { font-size: 0.8rem; margin-bottom: 0.4rem; }
+.help-box ul { margin: 0; padding-left: 1.2rem; }
+.help-box li { margin-bottom: 0.2rem; color: var(--text-secondary); }
 
 .progress-bar {
     width: 100%;
