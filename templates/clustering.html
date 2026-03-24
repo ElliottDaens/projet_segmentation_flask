@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+{% block title %}Clustering — Segmentation Embarcations{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Clustering & Visualisation</h1>
+    <p class="subtitle">Extraction d'embeddings, réduction de dimension et clustering</p>
+</div>
+
+<div class="tuto-box" data-tuto-id="clustering">
+    <div class="tuto-header" onclick="toggleTuto(this)">
+        <span>📘</span>
+        <h3>Comprendre le clustering — Outil d'exploration (optionnel)</h3>
+        <span class="tuto-toggle">▼</span>
+    </div>
+    <div class="tuto-body">
+        <div class="warning">Cette page est un <strong>outil d'exploration optionnel</strong>. Le workflow principal de segmentation est : <strong>Annotation → Entraînement → Prédiction</strong>. Le clustering te permet d'analyser ton dataset pour repérer des images similaires, mais ce n'est pas l'étape principale.</div>
+
+        <h4>C'est quoi le clustering ?</h4>
+        <p>Le clustering regroupe les <strong>images entières</strong> qui se ressemblent visuellement. C'est utile pour explorer ton dataset et repérer quelles photos contiennent des scènes similaires (même type de paysage, même luminosité…). Mais ça ne segmente pas les zones à l'intérieur d'une image — pour ça, utilise l'<strong>Annotation</strong>.</p>
+
+        <h4>Étape 1 : Les embeddings (fiches d'identité)</h4>
+        <p>L'ordi ne « voit » pas les images comme toi. Il faut d'abord <strong>transformer chaque image en une liste de nombres</strong> (un vecteur) qui résume son contenu. C'est ce qu'on appelle un <strong>embedding</strong>.</p>
+        <table class="param-table">
+            <tr><th>Méthode</th><th>Comment ça marche</th><th>Quand l'utiliser</th></tr>
+            <tr><td><strong>CNN (ResNet-18)</strong></td><td>Un réseau de neurones qui a déjà vu des millions d'images. Il sait extraire des caractéristiques visuelles (formes, textures, couleurs).</td><td>Premier choix recommandé — rapide et efficace même sans entraînement</td></tr>
+            <tr><td><strong>Auto-encodeur</strong></td><td>Un réseau entraîné spécifiquement sur TES images pour apprendre à les compresser/décompresser.</td><td>Si tu veux des features adaptées à ton dataset (nécessite d'abord lancer <code>scripts/train_autoencoder.py</code>)</td></tr>
+        </table>
+        <div class="tip">Conseil : commence toujours par <strong>CNN (ResNet-18)</strong>. C'est le plus simple et ça marche bien dès le départ.</div>
+
+        <h4>Étape 2 : L'algorithme de clustering</h4>
+        <table class="param-table">
+            <tr><th>Algorithme</th><th>Comment ça marche</th><th>Paramètres</th></tr>
+            <tr>
+                <td><strong>K-Means</strong></td>
+                <td>Tu lui dis « je veux K groupes » et il cherche le meilleur découpage possible.</td>
+                <td><strong>K (nombre de clusters)</strong> : commence par 3 ou 4. Regarde le graphique « coude » pour trouver le K optimal — c'est le point où ajouter un cluster n'améliore plus beaucoup.</td>
+            </tr>
+            <tr>
+                <td><strong>DBSCAN</strong></td>
+                <td>Il trouve les groupes tout seul en cherchant les zones denses. Les images isolées sont marquées comme « bruit ».</td>
+                <td><strong>Epsilon</strong> (rayon de voisinage) : 0.5 par défaut. Si trop de bruit → augmenter. <strong>Min samples</strong> : 2 par défaut (minimum de voisins pour former un groupe).</td>
+            </tr>
+            <tr>
+                <td><strong>Semi-supervisé</strong></td>
+                <td>Utilise les labels que tu as donnés dans l'onglet Étiquetage pour guider le clustering.</td>
+                <td>Fonctionne mieux si tu as déjà étiqueté quelques images.</td>
+            </tr>
+        </table>
+
+        <h4>Comment lire les résultats ?</h4>
+        <ul>
+            <li><strong>Scatter plot UMAP</strong> — Chaque point = une image. Les points proches = images similaires. Les couleurs = les clusters. Si les groupes sont bien séparés, c'est bon signe.</li>
+            <li><strong>Score silhouette</strong> — Entre -1 et +1. Plus c'est proche de 1, mieux les clusters sont séparés. Au-dessus de 0.5 = bon. En dessous de 0.25 = les groupes sont flous.</li>
+            <li><strong>Davies-Bouldin</strong> — Plus c'est bas, mieux c'est. Compare la dispersion interne vs la distance entre clusters.</li>
+            <li><strong>Graphique du coude</strong> — Montre l'inertie (erreur) pour chaque K. Le « coude » (changement de pente) indique le K optimal.</li>
+        </ul>
+        <div class="warning">Attention : avec seulement 13 images, les métriques ne seront pas parfaites. C'est normal. L'inspection visuelle (regarder les images dans chaque cluster) est plus fiable que les chiffres.</div>
+    </div>
+</div>
+
+<!-- Étape 1 : Embeddings -->
+<div class="card">
+    <h2>1. Extraction d'embeddings</h2>
+    <div class="form-row">
+        <div class="form-group">
+            <label>Méthode</label>
+            <select id="embedding-method">
+                <option value="cnn">CNN pré-entraîné (ResNet-18)</option>
+                <option value="autoencoder">Auto-encodeur convolutionnel</option>
+            </select>
+        </div>
+        <button class="btn btn-primary" id="btn-compute-embeddings" onclick="computeEmbeddings()">
+            Calculer les embeddings
+        </button>
+    </div>
+    <div id="embedding-status" class="status-box">
+        {% if state.embeddings is not none %}
+            <span class="status-ok">✅ Embeddings calculés ({{ state.method }}) — {{ state.filenames|length }} images, {{ state.embeddings.shape[1] }}D</span>
+        {% else %}
+            <span class="status-waiting">En attente du calcul…</span>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Étape 2 : Clustering -->
+<div class="card">
+    <h2>2. Clustering</h2>
+    <div class="form-row">
+        <div class="form-group">
+            <label>Algorithme</label>
+            <select id="clustering-method">
+                <option value="kmeans">K-Means</option>
+                <option value="dbscan">DBSCAN</option>
+            </select>
+        </div>
+        <div class="form-group" id="kmeans-params">
+            <label>Nombre de clusters (K)</label>
+            <input type="number" id="n-clusters" value="{{ n_clusters_default }}" min="2" max="10">
+        </div>
+        <div class="form-group hidden" id="dbscan-params">
+            <label>Epsilon</label>
+            <input type="number" id="dbscan-eps" value="0.5" step="0.1" min="0.1">
+            <label>Min samples</label>
+            <input type="number" id="dbscan-min-samples" value="2" min="1">
+        </div>
+        <button class="btn btn-primary" onclick="runClustering()">Lancer le clustering</button>
+        <button class="btn btn-secondary" onclick="runSemiSupervised()">Semi-supervisé</button>
+    </div>
+</div>
+
+<!-- Résultats -->
+<div class="card" id="results-section" style="{{ '' if state.cluster_report else 'display:none' }}">
+    <h2>3. Résultats</h2>
+    <div class="results-grid">
+        <div class="result-panel">
+            <h3>Scatter plot UMAP</h3>
+            <div id="scatter-plot" style="width:100%;height:500px;"></div>
+        </div>
+        <div class="result-panel">
+            <h3>Métriques</h3>
+            <div id="metrics-panel" class="metrics-list"></div>
+            <h3 style="margin-top:1rem;">K optimal (coude)</h3>
+            <div id="elbow-plot" style="width:100%;height:300px;"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Grille d'images par cluster -->
+<div class="card" id="cluster-grid-section" style="{{ '' if state.cluster_report else 'display:none' }}">
+    <h2>4. Images par cluster</h2>
+    <div id="cluster-tabs" class="tab-bar"></div>
+    <div id="cluster-grid" class="image-grid"></div>
+</div>
+
+<div id="loading-overlay" class="loading-overlay hidden">
+    <div class="spinner"></div>
+    <p id="loading-text">Traitement en cours…</p>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('clustering-method').addEventListener('change', function() {
+    document.getElementById('kmeans-params').classList.toggle('hidden', this.value !== 'kmeans');
+    document.getElementById('dbscan-params').classList.toggle('hidden', this.value !== 'dbscan');
+});
+
+{% if state.cluster_report %}
+renderResults({{ state.cluster_report|tojson }}, {{ state.metrics|tojson }}, {{ state.optimal_k|tojson if state.optimal_k else 'null' }});
+{% endif %}
+</script>
+{% endblock %}

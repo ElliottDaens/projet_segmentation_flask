@@ -1,0 +1,199 @@
+{% extends "base.html" %}
+{% block title %}Étiquetage — Segmentation Embarcations{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Étiquetage manuel</h1>
+    <p class="subtitle">Assignez des catégories aux images d'embarcations</p>
+</div>
+
+<div class="tuto-box" data-tuto-id="labeling">
+    <div class="tuto-header" onclick="toggleTuto(this)">
+        <span>📘</span>
+        <h3>Comprendre l'étiquetage — Outil complémentaire (optionnel)</h3>
+        <span class="tuto-toggle">▼</span>
+    </div>
+    <div class="tuto-body">
+        <div class="warning">Cette page est un <strong>outil complémentaire</strong>. Elle permet de donner un label global à une image entière (ex: « photo avec voilier »). Le vrai travail de segmentation par zones se fait dans l'onglet <strong>Annotation</strong>.</div>
+
+        <h4>C'est quoi ?</h4>
+        <p>L'étiquetage donne un <strong>nom global</strong> à chaque image (ex: « cette photo contient surtout un voilier »). C'est utile pour organiser ton dataset, mais ça ne délimite pas les zones à l'intérieur de l'image.</p>
+
+        <h4>Quand c'est utile ?</h4>
+        <ul>
+            <li>Pour <strong>trier ton dataset</strong> : repérer quelles images contiennent quel type d'embarcation.</li>
+            <li>En complément du clustering : donner un nom aux groupes trouvés automatiquement.</li>
+            <li>Pour garder une trace de ce que contient chaque photo.</li>
+        </ul>
+
+        <h4>Comment faire ?</h4>
+        <ol>
+            <li><strong>Clic sur une image</strong> dans la liste de gauche — elle s'affiche en grand à droite.</li>
+            <li><strong>Clic sur un label</strong> (bateau moteur, voilier, paddle…) pour l'assigner à cette image.</li>
+            <li>Tu peux aussi taper un <strong>label personnalisé</strong> si aucun ne correspond.</li>
+            <li>Le bouton <strong>« Suggestions par similarité »</strong> te montre les images les plus proches dans l'espace des embeddings — utile pour propager un label à des images similaires.</li>
+        </ol>
+
+        <div class="tip">Conseil : utilise les filtres en haut (recherche + filtre par label) pour voir rapidement les images « non étiquetées » et les traiter en priorité.</div>
+    </div>
+</div>
+
+<div class="labeling-layout">
+    <!-- Panneau de gauche : liste d'images -->
+    <div class="card labeling-list">
+        <h3>Images ({{ images|length }})</h3>
+        <div class="filter-bar">
+            <input type="text" id="search-images" placeholder="Rechercher…" oninput="filterImages()">
+            <select id="filter-label" onchange="filterImages()">
+                <option value="">Tous les labels</option>
+                <option value="non_etiqueté">Non étiqueté</option>
+                {% for lbl in default_labels %}
+                <option value="{{ lbl }}">{{ lbl|replace('_', ' ')|title }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="image-list" id="image-list">
+            {% for img in images %}
+            <div class="image-list-item" data-filename="{{ img.filename }}" data-label="{{ img.label }}"
+                 onclick="selectImage('{{ img.filename }}')">
+                <img src="{{ url_for('serve_image', filename=img.filename) }}" loading="lazy">
+                <div class="item-info">
+                    <span class="item-name">{{ img.filename }}</span>
+                    <span class="item-label badge badge-{{ img.label }}">{{ img.label|replace('_', ' ') }}</span>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Panneau de droite : détail + labeling -->
+    <div class="labeling-detail">
+        <div class="card" id="detail-panel">
+            <div id="detail-placeholder" class="placeholder-text">
+                <p>← Sélectionnez une image pour l'étiqueter</p>
+            </div>
+            <div id="detail-content" class="hidden">
+                <div class="detail-image-container">
+                    <img id="detail-img" src="" alt="">
+                </div>
+                <h3 id="detail-filename"></h3>
+
+                <div class="form-group">
+                    <label>Label</label>
+                    <div class="label-buttons" id="label-buttons">
+                        {% for lbl in default_labels %}
+                        <button class="btn btn-label" data-label="{{ lbl }}"
+                                onclick="assignLabel('{{ lbl }}')">
+                            {{ lbl|replace('_', ' ')|title }}
+                        </button>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-top:1rem;">
+                    <label>Label personnalisé</label>
+                    <div class="form-row">
+                        <input type="text" id="custom-label" placeholder="Ex: catamaran">
+                        <button class="btn btn-secondary" onclick="assignCustomLabel()">Appliquer</button>
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-top:1rem;">
+                    <button class="btn btn-secondary" onclick="suggestLabels()">
+                        💡 Suggestions par similarité
+                    </button>
+                    <div id="suggestions-panel" class="hidden" style="margin-top:0.5rem;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentFilename = null;
+
+function selectImage(filename) {
+    currentFilename = filename;
+    document.getElementById('detail-placeholder').classList.add('hidden');
+    document.getElementById('detail-content').classList.remove('hidden');
+    document.getElementById('detail-img').src = '/api/image/' + filename;
+    document.getElementById('detail-filename').textContent = filename;
+
+    document.querySelectorAll('.image-list-item').forEach(el => {
+        el.classList.toggle('selected', el.dataset.filename === filename);
+    });
+
+    const currentLabel = document.querySelector(`.image-list-item[data-filename="${filename}"]`)?.dataset.label || '';
+    document.querySelectorAll('.btn-label').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.label === currentLabel);
+    });
+    document.getElementById('suggestions-panel').classList.add('hidden');
+}
+
+function assignLabel(label) {
+    if (!currentFilename) return;
+    fetch('/api/label', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({filename: currentFilename, label: label})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            showToast(`Label "${label}" assigné à ${currentFilename}`);
+            const item = document.querySelector(`.image-list-item[data-filename="${currentFilename}"]`);
+            if (item) {
+                item.dataset.label = label;
+                item.querySelector('.item-label').textContent = label.replace(/_/g, ' ');
+                item.querySelector('.item-label').className = 'item-label badge badge-' + label;
+            }
+            document.querySelectorAll('.btn-label').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.label === label);
+            });
+        }
+    });
+}
+
+function assignCustomLabel() {
+    const label = document.getElementById('custom-label').value.trim();
+    if (label) assignLabel(label);
+}
+
+function suggestLabels() {
+    if (!currentFilename) return;
+    fetch('/api/suggest-labels', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({filename: currentFilename, n: 5})
+    })
+    .then(r => r.json())
+    .then(data => {
+        const panel = document.getElementById('suggestions-panel');
+        if (data.suggestions) {
+            panel.classList.remove('hidden');
+            panel.innerHTML = '<p><strong>Images les plus proches :</strong></p>' +
+                data.suggestions.map(s =>
+                    `<div class="suggestion-item" onclick="selectImage('${s.filename}')">
+                        <img src="/api/image/${s.filename}" loading="lazy">
+                        <span>${s.filename}</span>
+                        <span class="badge">${s.label.replace(/_/g,' ')}</span>
+                        <span class="dist">dist: ${s.distance.toFixed(2)}</span>
+                    </div>`
+                ).join('');
+        }
+    });
+}
+
+function filterImages() {
+    const search = document.getElementById('search-images').value.toLowerCase();
+    const labelFilter = document.getElementById('filter-label').value;
+    document.querySelectorAll('.image-list-item').forEach(item => {
+        const matchName = item.dataset.filename.toLowerCase().includes(search);
+        const matchLabel = !labelFilter || item.dataset.label === labelFilter;
+        item.style.display = (matchName && matchLabel) ? '' : 'none';
+    });
+}
+</script>
+{% endblock %}

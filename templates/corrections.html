@@ -1,0 +1,192 @@
+{% extends "base.html" %}
+{% block title %}Corrections — Segmentation Embarcations{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Correction des labels</h1>
+    <p class="subtitle">Modifiez les labels individuellement ou en masse</p>
+</div>
+
+<div class="tuto-box" data-tuto-id="corrections">
+    <div class="tuto-header" onclick="toggleTuto(this)">
+        <span>📘</span>
+        <h3>Comprendre les corrections — Affiner les labels</h3>
+        <span class="tuto-toggle">▼</span>
+    </div>
+    <div class="tuto-body">
+        <h4>C'est quoi ?</h4>
+        <p>Après l'étiquetage, tu as peut-être fait des erreurs ou tu veux <strong>changer d'avis</strong>. Cette page te permet de corriger les labels rapidement, un par un ou en masse.</p>
+
+        <h4>Pourquoi corriger ?</h4>
+        <ul>
+            <li>Un <strong>dataset propre</strong> donne de meilleurs résultats d'entraînement — « garbage in, garbage out ».</li>
+            <li>En regardant toutes les images d'un même label ensemble, tu repères plus facilement les <strong>erreurs</strong> (une barque étiquetée « voilier » par exemple).</li>
+            <li>L'historique des corrections te permet de <strong>tracer tes modifications</strong>.</li>
+        </ul>
+
+        <h4>Comment faire ?</h4>
+        <ol>
+            <li><strong>Filtrer par label</strong> — Clique sur un label en haut pour voir uniquement les images de cette catégorie.</li>
+            <li><strong>Correction individuelle</strong> — Utilise le menu déroulant sous chaque image pour changer son label.</li>
+            <li><strong>Correction en masse</strong> — Coche les images (clic sur l'image ou la case), choisis un label, et clique « Appliquer à la sélection ».</li>
+        </ol>
+
+        <div class="tip">Conseil : après avoir corrigé tes labels, retourne dans Clustering et lance le <strong>clustering semi-supervisé</strong> — il utilisera tes labels corrigés pour faire de meilleurs groupes.</div>
+    </div>
+</div>
+
+<div class="corrections-layout">
+    <!-- Filtrage par label -->
+    <div class="card">
+        <h3>Filtrer par label</h3>
+        <div class="label-chips clickable">
+            {% for label, files in by_label.items() %}
+            <button class="chip {{ 'active' if not request.args.get('filter') or request.args.get('filter') == label }}"
+                    onclick="filterByLabel('{{ label }}')">
+                {{ label|replace('_', ' ')|title }} ({{ files|length }})
+            </button>
+            {% endfor %}
+            <button class="chip" onclick="filterByLabel('')">Tous</button>
+        </div>
+    </div>
+
+    <!-- Action en masse -->
+    <div class="card">
+        <h3>Modification en masse</h3>
+        <div class="form-row">
+            <span id="selection-count">0 image(s) sélectionnée(s)</span>
+            <select id="bulk-label">
+                {% for lbl in default_labels %}
+                <option value="{{ lbl }}">{{ lbl|replace('_', ' ')|title }}</option>
+                {% endfor %}
+            </select>
+            <button class="btn btn-primary" onclick="bulkUpdate()">Appliquer à la sélection</button>
+            <button class="btn btn-secondary" onclick="selectAll()">Tout sélectionner</button>
+            <button class="btn btn-secondary" onclick="deselectAll()">Désélectionner</button>
+        </div>
+    </div>
+
+    <!-- Grille d'images -->
+    <div class="card">
+        <div class="image-grid corrections-grid" id="corrections-grid">
+            {% for label, files in by_label.items() %}
+                {% for fname in files %}
+                <div class="grid-item" data-filename="{{ fname }}" data-label="{{ label }}">
+                    <div class="grid-item-check">
+                        <input type="checkbox" class="item-checkbox" data-filename="{{ fname }}">
+                    </div>
+                    <img src="{{ url_for('serve_image', filename=fname) }}" loading="lazy"
+                         onclick="toggleCheck(this.parentElement)">
+                    <div class="grid-item-info">
+                        <span class="item-name">{{ fname }}</span>
+                        <span class="badge badge-{{ label }}">{{ label|replace('_', ' ') }}</span>
+                        <select class="inline-select" data-filename="{{ fname }}" onchange="quickUpdate('{{ fname }}', this.value)">
+                            <option value="">— changer —</option>
+                            {% for lbl in default_labels %}
+                            <option value="{{ lbl }}" {{ 'selected' if lbl == label }}>{{ lbl|replace('_', ' ')|title }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                {% endfor %}
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Historique -->
+    <div class="card">
+        <h3>Historique des corrections ({{ history|length }} dernières)</h3>
+        <div class="history-table">
+            <table>
+                <thead>
+                    <tr><th>Image</th><th>Ancien label</th><th>Nouveau label</th><th>Date</th></tr>
+                </thead>
+                <tbody>
+                    {% for entry in history|reverse %}
+                    <tr>
+                        <td>{{ entry.filename }}</td>
+                        <td><span class="badge">{{ entry.old_label }}</span></td>
+                        <td><span class="badge">{{ entry.new_label }}</span></td>
+                        <td>{{ entry.timestamp[:19] }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function filterByLabel(label) {
+    document.querySelectorAll('.corrections-grid .grid-item').forEach(item => {
+        item.style.display = (!label || item.dataset.label === label) ? '' : 'none';
+    });
+    document.querySelectorAll('.label-chips .chip').forEach(c => c.classList.remove('active'));
+}
+
+function toggleCheck(el) {
+    const cb = el.querySelector('.item-checkbox');
+    cb.checked = !cb.checked;
+    el.classList.toggle('checked', cb.checked);
+    updateSelectionCount();
+}
+
+function selectAll() {
+    document.querySelectorAll('.grid-item:not([style*="display: none"]) .item-checkbox').forEach(cb => {
+        cb.checked = true;
+        cb.closest('.grid-item').classList.add('checked');
+    });
+    updateSelectionCount();
+}
+
+function deselectAll() {
+    document.querySelectorAll('.item-checkbox').forEach(cb => {
+        cb.checked = false;
+        cb.closest('.grid-item').classList.remove('checked');
+    });
+    updateSelectionCount();
+}
+
+function updateSelectionCount() {
+    const count = document.querySelectorAll('.item-checkbox:checked').length;
+    document.getElementById('selection-count').textContent = count + ' image(s) sélectionnée(s)';
+}
+
+function bulkUpdate() {
+    const label = document.getElementById('bulk-label').value;
+    const entries = [];
+    document.querySelectorAll('.item-checkbox:checked').forEach(cb => {
+        entries.push({filename: cb.dataset.filename, label: label});
+    });
+    if (!entries.length) { showToast('Aucune image sélectionnée', 'warning'); return; }
+
+    fetch('/api/label-bulk', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({entries: entries})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            showToast(`${data.count} label(s) mis à jour`);
+            setTimeout(() => location.reload(), 800);
+        }
+    });
+}
+
+function quickUpdate(filename, label) {
+    if (!label) return;
+    fetch('/api/label', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({filename: filename, label: label})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) showToast(`Label mis à jour : ${filename}`);
+    });
+}
+</script>
+{% endblock %}
