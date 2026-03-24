@@ -10,12 +10,14 @@
 <div class="tuto-box" data-tuto-id="clustering">
     <div class="tuto-header" onclick="toggleTuto(this)">
         <span>📘</span>
-        <h3>Comprendre le clustering — Pourquoi et comment ?</h3>
+        <h3>Comprendre le clustering — Outil d'exploration (optionnel)</h3>
         <span class="tuto-toggle">▼</span>
     </div>
     <div class="tuto-body">
+        <div class="warning">Cette page est un <strong>outil d'exploration optionnel</strong>. Le workflow principal de segmentation est : <strong>Annotation → Entraînement → Prédiction</strong>. Le clustering te permet d'analyser ton dataset pour repérer des images similaires, mais ce n'est pas l'étape principale.</div>
+
         <h4>C'est quoi le clustering ?</h4>
-        <p>Le clustering, c'est demander à l'ordinateur de <strong>regrouper les images qui se ressemblent</strong> sans lui dire quelles catégories existent. Il trouve les groupes tout seul en analysant le contenu visuel.</p>
+        <p>Le clustering regroupe les <strong>images entières</strong> qui se ressemblent visuellement. C'est utile pour explorer ton dataset et repérer quelles photos contiennent des scènes similaires (même type de paysage, même luminosité…). Mais ça ne segmente pas les zones à l'intérieur d'une image — pour ça, utilise l'<strong>Annotation</strong>.</p>
 
         <h4>Étape 1 : Les embeddings (fiches d'identité)</h4>
         <p>L'ordi ne « voit » pas les images comme toi. Il faut d'abord <strong>transformer chaque image en une liste de nombres</strong> (un vecteur) qui résume son contenu. C'est ce qu'on appelle un <strong>embedding</strong>.</p>

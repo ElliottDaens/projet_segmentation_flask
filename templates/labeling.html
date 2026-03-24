@@ -10,18 +10,20 @@
 <div class="tuto-box" data-tuto-id="labeling">
     <div class="tuto-header" onclick="toggleTuto(this)">
         <span>📘</span>
-        <h3>Comprendre l'étiquetage — Pourquoi donner des noms ?</h3>
+        <h3>Comprendre l'étiquetage — Outil complémentaire (optionnel)</h3>
         <span class="tuto-toggle">▼</span>
     </div>
     <div class="tuto-body">
-        <h4>C'est quoi ?</h4>
-        <p>Le clustering a regroupé tes images par ressemblance, mais l'ordinateur ne sait pas que le groupe 1 contient des « voiliers » et le groupe 2 des « kayaks ». <strong>C'est toi qui donnes les noms</strong> (les « labels ») à chaque image.</p>
+        <div class="warning">Cette page est un <strong>outil complémentaire</strong>. Elle permet de donner un label global à une image entière (ex: « photo avec voilier »). Le vrai travail de segmentation par zones se fait dans l'onglet <strong>Annotation</strong>.</div>
 
-        <h4>Pourquoi c'est important ?</h4>
+        <h4>C'est quoi ?</h4>
+        <p>L'étiquetage donne un <strong>nom global</strong> à chaque image (ex: « cette photo contient surtout un voilier »). C'est utile pour organiser ton dataset, mais ça ne délimite pas les zones à l'intérieur de l'image.</p>
+
+        <h4>Quand c'est utile ?</h4>
         <ul>
-            <li>Ça permet ensuite de <strong>réentraîner le clustering</strong> en mode semi-supervisé (l'ordi utilise tes labels comme guide).</li>
-            <li>Ça crée un <strong>dataset étiqueté</strong> qu'on pourra utiliser pour entraîner un classifieur automatique.</li>
-            <li>Ça te permet de <strong>vérifier si le clustering est bon</strong> : si un cluster mélange des voiliers et des kayaks, c'est qu'il faut ajuster.</li>
+            <li>Pour <strong>trier ton dataset</strong> : repérer quelles images contiennent quel type d'embarcation.</li>
+            <li>En complément du clustering : donner un nom aux groupes trouvés automatiquement.</li>
+            <li>Pour garder une trace de ce que contient chaque photo.</li>
         </ul>
 
         <h4>Comment faire ?</h4>

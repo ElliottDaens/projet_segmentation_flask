@@ -3,31 +3,28 @@
 
 {% block content %}
 <div class="page-header">
-    <h1>Segmentation & Clustering d'Embarcations</h1>
-    <p class="subtitle">Pipeline complet : extraction de features, clustering, étiquetage et analyse par régions</p>
+    <h1>Segmentation d'images de paysages maritimes</h1>
+    <p class="subtitle">Apprends à l'ordinateur à reconnaître les zones dans tes photos : eau, terre, ciel, bateaux…</p>
 </div>
 
-<div class="tuto-box" data-tuto-id="index">
+<div class="tuto-box open" data-tuto-id="index">
     <div class="tuto-header" onclick="toggleTuto(this)">
         <span>📘</span>
-        <h3>Comprendre le projet — C'est quoi tout ça ?</h3>
+        <h3>Comment ça marche ?</h3>
         <span class="tuto-toggle">▼</span>
     </div>
     <div class="tuto-body">
-        <h4>L'objectif</h4>
-        <p>Tu as des photos de bateaux, et tu veux que l'ordinateur apprenne à <strong>reconnaître automatiquement</strong> ce qu'il y a dans ces photos : l'eau, la terre, le ciel, un bateau à moteur, un voilier, etc.</p>
+        <h4>Le principe</h4>
+        <p>Tes photos sont des <strong>paysages</strong> qui contiennent plusieurs éléments : de l'eau, de la terre, du ciel, et des embarcations (bateaux moteur, voiliers, kayaks…). L'objectif est d'apprendre à l'ordinateur à <strong>reconnaître chaque zone</strong> dans l'image — c'est ce qu'on appelle la <strong>segmentation sémantique</strong>.</p>
 
-        <h4>Le pipeline (les étapes dans l'ordre)</h4>
+        <h4>Le workflow en 3 étapes</h4>
         <ol>
-            <li><strong>Clustering</strong> — L'ordinateur regroupe les images qui se ressemblent, sans savoir ce que c'est. C'est comme trier un tas de photos par « ressemblance visuelle ».</li>
-            <li><strong>Étiquetage</strong> — Toi, tu donnes des noms aux groupes : « ça c'est des voiliers », « ça c'est des kayaks »…</li>
-            <li><strong>Annotation</strong> — Tu dessines directement sur les images pour montrer à l'ordi : « cette zone = eau, cette zone = bateau moteur ».</li>
-            <li><strong>Entraînement</strong> — L'ordi apprend de tes annotations grâce à un réseau de neurones (U-Net).</li>
-            <li><strong>Prédiction</strong> — L'ordi segmente tout seul de nouvelles images.</li>
+            <li><strong>Toi tu montres</strong> (Annotation) — Tu traces des polygones sur chaque image pour délimiter les zones : « ça c'est l'eau », « ça c'est un bateau moteur », « ça c'est le ciel »…</li>
+            <li><strong>L'ordi apprend</strong> (Entraînement) — Un réseau de neurones (U-Net) analyse tes exemples et apprend à reconnaître les zones tout seul.</li>
+            <li><strong>L'ordi fait seul</strong> (Prédiction) — Sur une nouvelle image, l'ordi colore automatiquement chaque zone avec la bonne catégorie.</li>
         </ol>
 
-        <h4>Par où commencer ?</h4>
-        <div class="tip">Conseil : commence par le <strong>Clustering</strong> pour avoir une vue d'ensemble de tes images, puis passe à l'<strong>Annotation</strong> pour dessiner les zones sur au moins 3 images. Ensuite, entraîne le modèle et teste la <strong>Prédiction</strong>.</div>
+        <div class="tip">Commence par l'étape 1 : va dans <strong>Annotation</strong> et dessine des polygones sur au moins 3 images. Plus tu en annotes, mieux le modèle apprendra.</div>
     </div>
 </div>
 
@@ -41,86 +38,108 @@
     </div>
 
     <div class="card stat-card">
-        <div class="stat-icon">🏷️</div>
+        <div class="stat-icon">🎨</div>
         <div class="stat-info">
-            <span class="stat-value">{{ n_labeled }}</span>
-            <span class="stat-label">Images étiquetées</span>
+            <span class="stat-value">{{ n_annotated }}</span>
+            <span class="stat-label">Images annotées</span>
         </div>
     </div>
 
     <div class="card stat-card">
         <div class="stat-icon">🧠</div>
         <div class="stat-info">
-            <span class="stat-value">{{ "✅" if has_embeddings else "❌" }}</span>
-            <span class="stat-label">Embeddings ({{ method or "—" }})</span>
+            <span class="stat-value">{{ "✅" if model_ready else "❌" }}</span>
+            <span class="stat-label">Modèle entraîné</span>
         </div>
     </div>
 
     <div class="card stat-card">
         <div class="stat-icon">📊</div>
         <div class="stat-info">
-            <span class="stat-value">{{ "✅" if has_clusters else "❌" }}</span>
-            <span class="stat-label">Clusters calculés</span>
+            <span class="stat-value">{{ n_annotated }}/{{ n_images }}</span>
+            <span class="stat-label">Progression</span>
         </div>
     </div>
 </div>
 
 <div class="card">
-    <h2>Pipeline de travail</h2>
+    <h2>Pipeline de segmentation</h2>
     <div class="pipeline-steps">
         <div class="step {{ 'done' if n_images > 0 else '' }}">
-            <div class="step-number">1</div>
+            <div class="step-number">0</div>
             <div class="step-content">
                 <h3>Images chargées</h3>
-                <p>{{ n_images }} images d'embarcations dans le dataset</p>
+                <p>{{ n_images }} photos de paysages maritimes dans le dossier <code>Images/</code></p>
             </div>
         </div>
-        <div class="step {{ 'done' if has_embeddings else '' }}">
+        <div class="step {{ 'done' if n_annotated >= 3 else '' }}">
+            <div class="step-number">1</div>
+            <div class="step-content">
+                <h3>Annotation par polygones</h3>
+                <p>Trace des polygones sur les images pour délimiter chaque zone (eau, terre, ciel, bateau moteur, voilier…). {{ n_annotated }} image(s) annotée(s) sur {{ n_images }}.</p>
+                <a href="{{ url_for('annotation_page') }}" class="btn btn-primary btn-sm">Annoter →</a>
+            </div>
+        </div>
+        <div class="step {{ 'done' if model_ready else '' }}">
             <div class="step-number">2</div>
             <div class="step-content">
-                <h3>Extraction d'embeddings</h3>
-                <p>CNN pré-entraîné (ResNet-18) ou auto-encodeur convolutionnel</p>
-                <a href="{{ url_for('clustering_page') }}" class="btn btn-sm">Lancer →</a>
+                <h3>Entraînement du modèle</h3>
+                <p>Le réseau U-Net apprend à reconnaître les zones grâce à tes annotations. Se lance depuis la page Annotation (bouton « Entraîner le modèle »).</p>
+                {% if n_annotated >= 3 %}
+                <span class="badge" style="background:var(--success)">Prêt ({{ n_annotated }} masques)</span>
+                {% else %}
+                <span class="badge" style="background:var(--warning)">Il faut au moins 3 images annotées</span>
+                {% endif %}
             </div>
         </div>
-        <div class="step {{ 'done' if has_clusters else '' }}">
+        <div class="step {{ 'done' if model_ready else '' }}">
             <div class="step-number">3</div>
             <div class="step-content">
-                <h3>Clustering</h3>
-                <p>K-Means / DBSCAN avec visualisation UMAP</p>
-                <a href="{{ url_for('clustering_page') }}" class="btn btn-sm">Visualiser →</a>
-            </div>
-        </div>
-        <div class="step {{ 'done' if n_labeled > 0 else '' }}">
-            <div class="step-number">4</div>
-            <div class="step-content">
-                <h3>Étiquetage & corrections</h3>
-                <p>Labels manuels, suggestions par similarité, corrections en masse</p>
-                <a href="{{ url_for('labeling_page') }}" class="btn btn-sm">Étiqueter →</a>
-            </div>
-        </div>
-        <div class="step">
-            <div class="step-number">5</div>
-            <div class="step-content">
-                <h3>Analyse par régions</h3>
-                <p>Superpixels SLIC, contours, détection d'anomalies locales</p>
-                <a href="{{ url_for('regions_page') }}" class="btn btn-sm">Explorer →</a>
+                <h3>Prédiction automatique</h3>
+                <p>L'ordinateur segmente automatiquement de nouvelles images : chaque pixel est colorié selon la zone détectée.</p>
+                {% if model_ready %}
+                <a href="{{ url_for('prediction_page') }}" class="btn btn-primary btn-sm">Prédire →</a>
+                {% else %}
+                <span class="badge" style="background:var(--text-secondary)">Disponible après entraînement</span>
+                {% endif %}
             </div>
         </div>
     </div>
 </div>
 
 <div class="card">
-    <h2>Catégories d'embarcations cibles</h2>
+    <h2>Zones à identifier dans les images</h2>
+    <p style="color:var(--text-secondary);font-size:0.9rem;margin-bottom:1rem;">Chaque photo peut contenir plusieurs de ces éléments. L'annotation par polygones permet de les délimiter précisément.</p>
     <div class="label-chips">
-        <span class="chip">🚤 Bateau moteur</span>
-        <span class="chip">⛵ Voilier</span>
-        <span class="chip">🏄 Paddle</span>
-        <span class="chip">🛶 Kayak</span>
-        <span class="chip">🛟 Gonflable</span>
-        <span class="chip">💨 Jet ski</span>
-        <span class="chip">🚣 Barque</span>
-        <span class="chip">❓ Autre</span>
+        <span class="chip" style="border-color:#0077FF"><span class="cls-dot" style="background:#0077FF"></span> Eau</span>
+        <span class="chip" style="border-color:#8B5A2B"><span class="cls-dot" style="background:#8B5A2B"></span> Terre</span>
+        <span class="chip" style="border-color:#87CEEB"><span class="cls-dot" style="background:#87CEEB"></span> Ciel</span>
+        <span class="chip" style="border-color:#FF0000"><span class="cls-dot" style="background:#FF0000"></span> Bateau moteur</span>
+        <span class="chip" style="border-color:#FFA500"><span class="cls-dot" style="background:#FFA500"></span> Voilier</span>
+        <span class="chip" style="border-color:#00FF00"><span class="cls-dot" style="background:#00FF00"></span> Paddle</span>
+        <span class="chip" style="border-color:#FFFF00"><span class="cls-dot" style="background:#FFFF00"></span> Kayak</span>
+        <span class="chip" style="border-color:#FF00FF"><span class="cls-dot" style="background:#FF00FF"></span> Gonflable</span>
+        <span class="chip" style="border-color:#808080"><span class="cls-dot" style="background:#808080"></span> Autre objet</span>
+    </div>
+</div>
+
+<div class="card">
+    <h2>Outils complémentaires</h2>
+    <div class="dashboard-grid" style="margin-top:0.5rem;">
+        <a href="{{ url_for('regions_page') }}" class="card stat-card" style="text-decoration:none;">
+            <div class="stat-icon">🔍</div>
+            <div class="stat-info">
+                <span class="stat-value" style="font-size:1rem;">Régions</span>
+                <span class="stat-label">Analyse automatique des zones (superpixels, contours) — utile pour t'aider à annoter</span>
+            </div>
+        </a>
+        <a href="{{ url_for('clustering_page') }}" class="card stat-card" style="text-decoration:none;">
+            <div class="stat-icon">📊</div>
+            <div class="stat-info">
+                <span class="stat-value" style="font-size:1rem;">Clustering</span>
+                <span class="stat-label">Regrouper les images similaires — exploration du dataset</span>
+            </div>
+        </a>
     </div>
 </div>
 {% endblock %}

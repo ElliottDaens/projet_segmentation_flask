@@ -74,16 +74,14 @@ def add_history_entry(filename: str, old_label: str, new_label: str):
 @app.route("/")
 def index():
     images = list_images()
-    labels = load_labels()
-    n_labeled = sum(1 for v in labels.values() if v.get("label", "") != "non_etiqueté")
-    has_embeddings = _state["embeddings"] is not None
-    has_clusters = _state["cluster_labels"] is not None
+    from preprocessing.segmentation_dataset import count_annotated_images
+    n_annotated = count_annotated_images()
+    model_path = os.path.join(config.MODELS_SAVE_DIR, "unet.pth")
+    model_ready = os.path.isfile(model_path)
     return render_template("index.html",
                            n_images=len(images),
-                           n_labeled=n_labeled,
-                           has_embeddings=has_embeddings,
-                           has_clusters=has_clusters,
-                           method=_state["method"])
+                           n_annotated=n_annotated,
+                           model_ready=model_ready)
 
 
 # ── ROUTE : Clustering ──────────────────────────────────────────────
