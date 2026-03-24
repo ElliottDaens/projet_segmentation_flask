@@ -7,6 +7,38 @@
     <p class="subtitle">Le modèle segmente l'image automatiquement grâce à vos annotations</p>
 </div>
 
+<div class="tuto-box" data-tuto-id="prediction">
+    <div class="tuto-header" onclick="toggleTuto(this)">
+        <span>📘</span>
+        <h3>Comprendre la prédiction — L'ordinateur fait seul</h3>
+        <span class="tuto-toggle">▼</span>
+    </div>
+    <div class="tuto-body">
+        <h4>C'est quoi ?</h4>
+        <p>C'est le <strong>résultat final</strong> de tout ton travail. Le modèle U-Net que tu as entraîné avec tes annotations est maintenant capable de <strong>segmenter automatiquement</strong> une image qu'il n'a jamais vue.</p>
+        <p>Il va colorier chaque pixel de l'image avec la classe qu'il pense reconnaître : bleu pour l'eau, marron pour la terre, rouge pour un bateau moteur, etc.</p>
+
+        <h4>Comment ça marche en coulisses ?</h4>
+        <ol>
+            <li>L'image est redimensionnée à 256×256 pixels.</li>
+            <li>Elle passe dans le <strong>réseau U-Net</strong> (encodeur ResNet-18 + décodeur).</li>
+            <li>Pour chaque pixel, le réseau prédit la probabilité de chaque classe.</li>
+            <li>La classe avec la plus haute probabilité est choisie → le masque de segmentation.</li>
+        </ol>
+
+        <h4>Comment lire les résultats ?</h4>
+        <ul>
+            <li><strong>Image originale</strong> — Pour comparaison.</li>
+            <li><strong>Segmentation prédite</strong> — Chaque couleur = une classe. Consulte la légende en dessous.</li>
+            <li><strong>Superposition</strong> — L'image originale avec le masque semi-transparent par-dessus. Permet de voir si les zones correspondent bien.</li>
+            <li><strong>Pourcentages</strong> — La proportion de l'image occupée par chaque classe.</li>
+        </ul>
+
+        <h4>Si les résultats sont mauvais ?</h4>
+        <div class="tip">C'est normal au début ! Pour améliorer : annote <strong>plus d'images</strong> (plus il y a d'exemples, mieux c'est), annote <strong>plus précisément</strong> (polygones bien ajustés aux bords), et relance l'entraînement. Avec 5-10 images bien annotées, les résultats s'améliorent significativement.</div>
+    </div>
+</div>
+
 {% if not model_ready %}
 <div class="card">
     <div class="placeholder-text" style="flex-direction:column;gap:1rem;">

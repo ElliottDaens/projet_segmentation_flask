@@ -7,6 +7,30 @@
     <p class="subtitle">Pipeline complet : extraction de features, clustering, étiquetage et analyse par régions</p>
 </div>
 
+<div class="tuto-box" data-tuto-id="index">
+    <div class="tuto-header" onclick="toggleTuto(this)">
+        <span>📘</span>
+        <h3>Comprendre le projet — C'est quoi tout ça ?</h3>
+        <span class="tuto-toggle">▼</span>
+    </div>
+    <div class="tuto-body">
+        <h4>L'objectif</h4>
+        <p>Tu as des photos de bateaux, et tu veux que l'ordinateur apprenne à <strong>reconnaître automatiquement</strong> ce qu'il y a dans ces photos : l'eau, la terre, le ciel, un bateau à moteur, un voilier, etc.</p>
+
+        <h4>Le pipeline (les étapes dans l'ordre)</h4>
+        <ol>
+            <li><strong>Clustering</strong> — L'ordinateur regroupe les images qui se ressemblent, sans savoir ce que c'est. C'est comme trier un tas de photos par « ressemblance visuelle ».</li>
+            <li><strong>Étiquetage</strong> — Toi, tu donnes des noms aux groupes : « ça c'est des voiliers », « ça c'est des kayaks »…</li>
+            <li><strong>Annotation</strong> — Tu dessines directement sur les images pour montrer à l'ordi : « cette zone = eau, cette zone = bateau moteur ».</li>
+            <li><strong>Entraînement</strong> — L'ordi apprend de tes annotations grâce à un réseau de neurones (U-Net).</li>
+            <li><strong>Prédiction</strong> — L'ordi segmente tout seul de nouvelles images.</li>
+        </ol>
+
+        <h4>Par où commencer ?</h4>
+        <div class="tip">Conseil : commence par le <strong>Clustering</strong> pour avoir une vue d'ensemble de tes images, puis passe à l'<strong>Annotation</strong> pour dessiner les zones sur au moins 3 images. Ensuite, entraîne le modèle et teste la <strong>Prédiction</strong>.</div>
+    </div>
+</div>
+
 <div class="dashboard-grid">
     <div class="card stat-card">
         <div class="stat-icon">🖼️</div>

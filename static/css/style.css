@@ -693,6 +693,127 @@ input:focus, select:focus { border-color: var(--primary); }
 
 .annotation-stats { font-size: 0.85rem; }
 
+/* ── Tutoriel intégré ──────────────────────────────────────────── */
+
+.tuto-box {
+    background: linear-gradient(135deg, rgba(124,58,237,0.06), rgba(59,130,246,0.06));
+    border: 1px solid rgba(124,58,237,0.2);
+    border-radius: 12px;
+    margin-bottom: 1.5rem;
+    overflow: hidden;
+}
+
+.tuto-header {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.8rem 1.2rem;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.2s;
+}
+
+.tuto-header:hover { background: rgba(124,58,237,0.06); }
+
+.tuto-header h3 {
+    font-size: 0.95rem;
+    font-weight: 600;
+    margin: 0;
+    flex: 1;
+}
+
+.tuto-toggle {
+    font-size: 0.8rem;
+    color: var(--primary-light);
+    transition: transform 0.3s;
+}
+
+.tuto-box.open .tuto-toggle { transform: rotate(180deg); }
+
+.tuto-body {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.4s ease, padding 0.3s ease;
+    padding: 0 1.2rem;
+}
+
+.tuto-box.open .tuto-body {
+    max-height: 3000px;
+    padding: 0 1.2rem 1.2rem;
+}
+
+.tuto-body h4 {
+    font-size: 0.9rem;
+    font-weight: 700;
+    margin: 1rem 0 0.4rem;
+    color: var(--primary-light);
+}
+
+.tuto-body h4:first-child { margin-top: 0; }
+
+.tuto-body p {
+    font-size: 0.85rem;
+    line-height: 1.65;
+    margin-bottom: 0.6rem;
+    color: var(--text);
+}
+
+.tuto-body ul, .tuto-body ol {
+    font-size: 0.85rem;
+    line-height: 1.65;
+    padding-left: 1.4rem;
+    margin-bottom: 0.6rem;
+}
+
+.tuto-body li { margin-bottom: 0.3rem; }
+
+.tuto-body strong { color: var(--primary-light); }
+
+.tuto-body code {
+    background: var(--bg-input);
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+}
+
+.tuto-body .param-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0.6rem 0;
+    font-size: 0.82rem;
+}
+
+.tuto-body .param-table th {
+    background: var(--bg-input);
+    padding: 0.4rem 0.6rem;
+    text-align: left;
+    font-weight: 600;
+    border: 1px solid var(--border);
+}
+
+.tuto-body .param-table td {
+    padding: 0.4rem 0.6rem;
+    border: 1px solid var(--border);
+}
+
+.tuto-body .tip {
+    background: rgba(16,185,129,0.08);
+    border-left: 3px solid var(--success);
+    padding: 0.5rem 0.8rem;
+    border-radius: 0 6px 6px 0;
+    margin: 0.6rem 0;
+    font-size: 0.82rem;
+}
+
+.tuto-body .warning {
+    background: rgba(245,158,11,0.08);
+    border-left: 3px solid var(--warning);
+    padding: 0.5rem 0.8rem;
+    border-radius: 0 6px 6px 0;
+    margin: 0.6rem 0;
+    font-size: 0.82rem;
+}
+
 /* ── Utilitaires ───────────────────────────────────────────────── */
 
 .hidden { display: none !important; }

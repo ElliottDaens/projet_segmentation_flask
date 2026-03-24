@@ -17,6 +17,25 @@ function toggleTheme() {
     document.documentElement.setAttribute('data-theme', saved);
 })();
 
+// ── Tutoriel toggle ─────────────────────────────────────────────────
+
+function toggleTuto(el) {
+    const box = el.closest('.tuto-box');
+    box.classList.toggle('open');
+    const key = 'tuto_' + (box.dataset.tutoId || '');
+    localStorage.setItem(key, box.classList.contains('open') ? '1' : '0');
+}
+
+(function initTutos() {
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('.tuto-box').forEach(box => {
+            const key = 'tuto_' + (box.dataset.tutoId || '');
+            const saved = localStorage.getItem(key);
+            if (saved === '1') box.classList.add('open');
+        });
+    });
+})();
+
 // ── Toast notifications ─────────────────────────────────────────────
 
 function showToast(message, type = 'info') {

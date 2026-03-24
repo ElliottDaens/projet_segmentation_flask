@@ -7,6 +7,35 @@
     <p class="subtitle">Assignez des catégories aux images d'embarcations</p>
 </div>
 
+<div class="tuto-box" data-tuto-id="labeling">
+    <div class="tuto-header" onclick="toggleTuto(this)">
+        <span>📘</span>
+        <h3>Comprendre l'étiquetage — Pourquoi donner des noms ?</h3>
+        <span class="tuto-toggle">▼</span>
+    </div>
+    <div class="tuto-body">
+        <h4>C'est quoi ?</h4>
+        <p>Le clustering a regroupé tes images par ressemblance, mais l'ordinateur ne sait pas que le groupe 1 contient des « voiliers » et le groupe 2 des « kayaks ». <strong>C'est toi qui donnes les noms</strong> (les « labels ») à chaque image.</p>
+
+        <h4>Pourquoi c'est important ?</h4>
+        <ul>
+            <li>Ça permet ensuite de <strong>réentraîner le clustering</strong> en mode semi-supervisé (l'ordi utilise tes labels comme guide).</li>
+            <li>Ça crée un <strong>dataset étiqueté</strong> qu'on pourra utiliser pour entraîner un classifieur automatique.</li>
+            <li>Ça te permet de <strong>vérifier si le clustering est bon</strong> : si un cluster mélange des voiliers et des kayaks, c'est qu'il faut ajuster.</li>
+        </ul>
+
+        <h4>Comment faire ?</h4>
+        <ol>
+            <li><strong>Clic sur une image</strong> dans la liste de gauche — elle s'affiche en grand à droite.</li>
+            <li><strong>Clic sur un label</strong> (bateau moteur, voilier, paddle…) pour l'assigner à cette image.</li>
+            <li>Tu peux aussi taper un <strong>label personnalisé</strong> si aucun ne correspond.</li>
+            <li>Le bouton <strong>« Suggestions par similarité »</strong> te montre les images les plus proches dans l'espace des embeddings — utile pour propager un label à des images similaires.</li>
+        </ol>
+
+        <div class="tip">Conseil : utilise les filtres en haut (recherche + filtre par label) pour voir rapidement les images « non étiquetées » et les traiter en priorité.</div>
+    </div>
+</div>
+
 <div class="labeling-layout">
     <!-- Panneau de gauche : liste d'images -->
     <div class="card labeling-list">

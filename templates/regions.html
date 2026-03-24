@@ -7,6 +7,47 @@
     <p class="subtitle">Superpixels SLIC, détection de contours et anomalies locales</p>
 </div>
 
+<div class="tuto-box" data-tuto-id="regions">
+    <div class="tuto-header" onclick="toggleTuto(this)">
+        <span>📘</span>
+        <h3>Comprendre l'analyse par régions — Zoomer dans les détails</h3>
+        <span class="tuto-toggle">▼</span>
+    </div>
+    <div class="tuto-body">
+        <h4>C'est quoi ?</h4>
+        <p>Au lieu de regarder l'image entière, on la <strong>découpe en petites zones</strong> (les superpixels) et on analyse chaque zone séparément. Ça permet de détecter les différentes parties d'une image : l'eau, le ciel, la coque du bateau…</p>
+
+        <h4>Pourquoi c'est utile ?</h4>
+        <ul>
+            <li><strong>Comprendre la composition</strong> d'une image : quelle proportion est de l'eau ? du ciel ? du bateau ?</li>
+            <li><strong>Détecter les anomalies</strong> : une zone qui ne ressemble à rien d'habituel (objet bizarre, reflet, artefact).</li>
+            <li><strong>Aider l'annotation</strong> : en voyant les contours détectés automatiquement, tu sais où tracer tes polygones.</li>
+        </ul>
+
+        <h4>Les paramètres</h4>
+        <table class="param-table">
+            <tr><th>Paramètre</th><th>Ce que ça fait</th><th>Valeur recommandée</th></tr>
+            <tr>
+                <td><strong>Nombre de superpixels</strong></td>
+                <td>Plus c'est élevé, plus les zones sont petites et détaillées. Moins c'est élevé, plus les zones sont grandes et grossières.</td>
+                <td>50-100 pour commencer. Monte à 200+ si tu veux du détail.</td>
+            </tr>
+            <tr>
+                <td><strong>Clusters de régions</strong></td>
+                <td>Les superpixels similaires sont regroupés. Ce nombre contrôle combien de types de régions on cherche.</td>
+                <td>3-5 (eau, ciel, objet, terre…)</td>
+            </tr>
+        </table>
+
+        <h4>Comment lire les résultats ?</h4>
+        <ul>
+            <li><strong>Image originale</strong> — Pour comparaison.</li>
+            <li><strong>Superpixels + anomalies</strong> — Les lignes bleues montrent les bordures de chaque zone. Les zones rouges = anomalies (visuellement différentes du reste).</li>
+            <li><strong>Détection de contours</strong> — Les bords des objets détectés par l'algorithme de Canny. Montre bien la forme des embarcations.</li>
+        </ul>
+    </div>
+</div>
+
 <div class="card">
     <h2>Sélection & paramètres</h2>
     <div class="form-row">

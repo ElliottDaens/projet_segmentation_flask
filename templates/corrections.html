@@ -7,6 +7,34 @@
     <p class="subtitle">Modifiez les labels individuellement ou en masse</p>
 </div>
 
+<div class="tuto-box" data-tuto-id="corrections">
+    <div class="tuto-header" onclick="toggleTuto(this)">
+        <span>📘</span>
+        <h3>Comprendre les corrections — Affiner les labels</h3>
+        <span class="tuto-toggle">▼</span>
+    </div>
+    <div class="tuto-body">
+        <h4>C'est quoi ?</h4>
+        <p>Après l'étiquetage, tu as peut-être fait des erreurs ou tu veux <strong>changer d'avis</strong>. Cette page te permet de corriger les labels rapidement, un par un ou en masse.</p>
+
+        <h4>Pourquoi corriger ?</h4>
+        <ul>
+            <li>Un <strong>dataset propre</strong> donne de meilleurs résultats d'entraînement — « garbage in, garbage out ».</li>
+            <li>En regardant toutes les images d'un même label ensemble, tu repères plus facilement les <strong>erreurs</strong> (une barque étiquetée « voilier » par exemple).</li>
+            <li>L'historique des corrections te permet de <strong>tracer tes modifications</strong>.</li>
+        </ul>
+
+        <h4>Comment faire ?</h4>
+        <ol>
+            <li><strong>Filtrer par label</strong> — Clique sur un label en haut pour voir uniquement les images de cette catégorie.</li>
+            <li><strong>Correction individuelle</strong> — Utilise le menu déroulant sous chaque image pour changer son label.</li>
+            <li><strong>Correction en masse</strong> — Coche les images (clic sur l'image ou la case), choisis un label, et clique « Appliquer à la sélection ».</li>
+        </ol>
+
+        <div class="tip">Conseil : après avoir corrigé tes labels, retourne dans Clustering et lance le <strong>clustering semi-supervisé</strong> — il utilisera tes labels corrigés pour faire de meilleurs groupes.</div>
+    </div>
+</div>
+
 <div class="corrections-layout">
     <!-- Filtrage par label -->
     <div class="card">

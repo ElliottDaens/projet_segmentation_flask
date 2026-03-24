@@ -7,6 +7,46 @@
     <p class="subtitle">Délimitez les zones (eau, terre, ciel, bateau…) en traçant des polygones sur l'image</p>
 </div>
 
+<div class="tuto-box" data-tuto-id="annotation">
+    <div class="tuto-header" onclick="toggleTuto(this)">
+        <span>📘</span>
+        <h3>Comprendre l'annotation — Apprendre à l'ordinateur</h3>
+        <span class="tuto-toggle">▼</span>
+    </div>
+    <div class="tuto-body">
+        <h4>C'est quoi ?</h4>
+        <p>C'est <strong>l'étape la plus importante</strong>. Tu dessines des polygones directement sur l'image pour dire à l'ordinateur : « cette zone = eau », « cette zone = bateau moteur », « cette zone = ciel », etc.</p>
+        <p>C'est comme donner des <strong>exemples</strong> à un élève : tu lui montres ce que c'est, et ensuite il sera capable de le reconnaître tout seul sur de nouvelles images.</p>
+
+        <h4>Pourquoi des polygones ?</h4>
+        <p>Un polygone permet de <strong>délimiter précisément</strong> les contours d'une zone. C'est plus propre qu'un pinceau : tu cliques aux coins de la zone, et le polygone se forme automatiquement.</p>
+
+        <h4>Comment faire ? (pas à pas)</h4>
+        <ol>
+            <li><strong>Choisis une classe</strong> à gauche (ex: « Eau ») — c'est ce que tu vas dessiner.</li>
+            <li><strong>Clique sur l'image</strong> pour placer les sommets du polygone, en suivant les bords de la zone.</li>
+            <li><strong>Ferme le polygone</strong> en cliquant sur le premier point (le cercle blanc) ou en appuyant sur <strong>Entrée</strong>.</li>
+            <li><strong>Recommence</strong> avec une autre classe : sélectionne « Terre », dessine un nouveau polygone sur la zone de terre, etc.</li>
+            <li><strong>Sauvegarde</strong> avec le bouton 💾 ou <strong>Ctrl+S</strong>.</li>
+        </ol>
+
+        <h4>Combien de polygones par image ?</h4>
+        <p>Autant que nécessaire. Une image typique pourrait avoir :</p>
+        <ul>
+            <li>1 grand polygone pour le <strong>ciel</strong></li>
+            <li>1 grand polygone pour l'<strong>eau</strong></li>
+            <li>1 ou plusieurs polygones pour les <strong>embarcations</strong></li>
+            <li>Éventuellement 1 pour la <strong>terre</strong> si visible</li>
+        </ul>
+
+        <h4>Combien d'images annoter ?</h4>
+        <div class="warning">Minimum <strong>3 images</strong> pour pouvoir entraîner le modèle. Plus tu en annotes, mieux le modèle apprendra. Avec 13 images, annoter les 13 est l'idéal, mais 5-8 suffisent pour de premiers résultats.</div>
+
+        <h4>Quand lancer l'entraînement ?</h4>
+        <p>Quand tu as annoté au moins 3 images, le bouton <strong>« Entraîner le modèle »</strong> apparaît. L'entraînement prend quelques minutes. Ensuite, va dans l'onglet <strong>Prédiction</strong> pour voir le résultat.</p>
+    </div>
+</div>
+
 <div class="annotation-layout">
     <!-- Barre d'outils gauche -->
     <div class="card annotation-toolbar">
